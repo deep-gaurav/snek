@@ -1,11 +1,13 @@
 //! Shows how to render simple primitive shapes with a single color.
 pub mod food;
 pub mod snek;
+pub mod window;
 
-use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
+use bevy::{input::touch::TouchPhase, prelude::*, window::WindowResolution};
+use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food};
-use snek::{update_cell_direction, update_head_sensor};
+use snek::{spawn_new_cell, update_cell_direction, update_head_sensor};
+use window::{get_height, get_width};
 
 #[derive(Debug, Resource)]
 pub struct GameConfig {
@@ -55,7 +57,7 @@ pub struct Moves {
 
 #[derive(Component)]
 pub struct Spawner {
-    spawners: Vec<(Vec3, Direction)>,
+    pub spawners: Vec<(Vec3, Direction)>,
 }
 
 #[derive(Component)]
@@ -76,33 +78,59 @@ pub struct ChangeDirection {
 #[derive(Component)]
 pub struct CellTag;
 
+#[derive(Event)]
+pub enum InputsActions {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 fn main() {
-    App::new()
-        .insert_resource(GameConfig {
-            speed: 60.0,
-            cell_size: (20.0, 20.0),
-            game_size: (0, 0),
-        })
-        .add_event::<ChangeDirection>()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new())
-        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugins(RapierDebugRenderPlugin::default())
-        // .add_plugins(LogDiagnosticsPlugin::default())
-        // .add_plugins(FrameTimeDiagnosticsPlugin::default())
-        .add_systems(Startup, (setup, setup_borders).chain())
-        .add_systems(
-            Update,
-            (
-                update_cell_direction,
-                move_cells,
-                keyboard_input,
-                update_head_sensor,
-            ), // .before(keyboard_input)
-               // .before(update_cell_direction),
-        )
-        .add_systems(Update, (spawn_food, handle_food_collision))
-        .run();
+    let mut app = App::new();
+    app.insert_resource(GameConfig {
+        speed: 60.0,
+        cell_size: (20.0, 20.0),
+        game_size: (0, 0),
+    })
+    .add_event::<ChangeDirection>()
+    .add_event::<InputsActions>()
+    .add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            resolution: WindowResolution::new(get_width(), get_height()),
+            canvas: Some("#main_canvas".into()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }))
+    .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+    // .add_plugins(LogDiagnosticsPlugin::default())
+    // .add_plugins(FrameTimeDiagnosticsPlugin::default())
+    .add_systems(Startup, (setup, setup_borders).chain())
+    .add_systems(
+        Update,
+        (
+            update_cell_direction,
+            move_cells.before(spawn_new_cell),
+            keyboard_input,
+            handle_touch,
+            handle_input_event,
+            update_head_sensor,
+            spawn_new_cell,
+        ), // .before(keyboard_input)
+           // .before(update_cell_direction),
+    )
+    .add_systems(Update, (spawn_food, handle_food_collision));
+
+    #[cfg(debug_assertions)]
+    debug_plugins(&mut app);
+    app.run()
+}
+#[cfg(debug_assertions)]
+fn debug_plugins(app: &mut App) {
+    app.add_plugins(RapierDebugRenderPlugin::default());
+
+    // app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 }
 
 fn setup(mut config: ResMut<GameConfig>, mut commands: Commands, window: Query<&Window>) {
@@ -291,28 +319,26 @@ fn move_cells(
     }
 }
 
-fn keyboard_input(
-    keys: Res<Input<KeyCode>>,
+fn handle_input_event(
+    mut event: EventReader<InputsActions>,
     mut query: Query<(Entity, &mut LastMoveId, &mut Moves), With<Player>>,
     mut head: Query<(&Parent, &Transform, &mut Direction, &mut MoveId, Entity), With<Head>>,
     mut ev_change_direction: EventWriter<ChangeDirection>,
 ) {
+    let Some(event) = event.iter().next() else {
+        return;
+    };
+    let direction = match event {
+        InputsActions::Up => Vec2 { x: 0.0, y: 1.0 },
+        InputsActions::Down => Vec2 { x: 0.0, y: -1.0 },
+        InputsActions::Left => Vec2 { x: -1.0, y: 0.0 },
+        InputsActions::Right => Vec2 { x: 1.0, y: 0.0 },
+    };
+
     let val = query.single_mut();
     let player_id = val.0;
     let mut last_move = val.1;
     let mut moves = val.2;
-    let direction;
-    if keys.just_pressed(KeyCode::Up) {
-        direction = Vec2 { x: 0.0, y: 1.0 };
-    } else if keys.just_pressed(KeyCode::Down) {
-        direction = Vec2 { x: 0.0, y: -1.0 };
-    } else if keys.just_pressed(KeyCode::Left) {
-        direction = Vec2 { x: -1.0, y: 0.0 };
-    } else if keys.just_pressed(KeyCode::Right) {
-        direction = Vec2 { x: 1.0, y: 0.0 };
-    } else {
-        return;
-    }
     for (parent, head, head_direction, _, head_id) in head.iter_mut() {
         if parent.get() == player_id
             && head_direction.0 != direction
@@ -336,6 +362,40 @@ fn keyboard_input(
 
             // head_direction.0 = direction;
             // moveid.0 = last_move.0;
+        }
+    }
+}
+
+fn keyboard_input(keys: Res<Input<KeyCode>>, mut event: EventWriter<InputsActions>) {
+    if keys.just_pressed(KeyCode::Up) {
+        event.send(InputsActions::Up);
+    } else if keys.just_pressed(KeyCode::Down) {
+        event.send(InputsActions::Down);
+    } else if keys.just_pressed(KeyCode::Left) {
+        event.send(InputsActions::Left);
+    } else if keys.just_pressed(KeyCode::Right) {
+        event.send(InputsActions::Right);
+    } else {
+        return;
+    }
+}
+
+fn handle_touch(touch_event: Res<Touches>, mut event: EventWriter<InputsActions>) {
+    for touch in touch_event.iter_just_released() {
+        let distance = touch.distance();
+        const THRESHOLD: f32 = 50.0;
+        if distance.x.abs() > distance.y.abs() && distance.x.abs() > THRESHOLD {
+            if distance.x > 0. {
+                event.send(InputsActions::Right);
+            } else {
+                event.send(InputsActions::Left);
+            }
+        } else if distance.y.abs() > THRESHOLD {
+            if distance.y > 0. {
+                event.send(InputsActions::Down);
+            } else {
+                event.send(InputsActions::Up);
+            }
         }
     }
 }

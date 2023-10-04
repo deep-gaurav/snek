@@ -1,5 +1,5 @@
 [target.aarch64-apple-darwin]
-rustflags = [
-    "-C",
-    "link-arg=-fuse-ld=/opt/homebrew/opt/llvm/bin/ld64.lld",
-]
+rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/opt/llvm/bin/ld64.lld"]
+
+[target.wasm32-unknown-unknown]
+runner = "wasm-server-runner"

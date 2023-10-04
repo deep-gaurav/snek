@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::{Collider, CollisionEvent, ContactForceEvent, Sensor};
+use bevy_rapier2d::prelude::{Collider, CollisionEvent, Sensor};
 
 use crate::{GameConfig, HeadSensor, Spawner};
 
@@ -14,7 +14,7 @@ pub fn spawn_food(mut commands: Commands, food_query: Query<&Food>, config: Res<
         let pos_y = rand::random::<f32>() * ((config.game_size.1 - pad) as f32)
             - ((config.game_size.1 / 2) as f32);
 
-        let food = commands
+        let _food = commands
             .spawn((
                 Food,
                 SpriteBundle {
@@ -46,7 +46,7 @@ pub fn handle_food_collision(
     mut commands: Commands,
 ) {
     for collision_event in collision_events.iter() {
-        if let CollisionEvent::Started(object, collider, flags) = collision_event {
+        if let CollisionEvent::Started(object, collider, _flags) = collision_event {
             let food = food.get(*collider);
             let head = head_sensor.get(*object);
             if let (Ok(head), Ok(food)) = (head, food) {
