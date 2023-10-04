@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{Collider, CollisionEvent, ContactForceEvent, Sensor};
 
-use crate::{GameConfig, HeadSensor};
+use crate::{GameConfig, HeadSensor, Spawner};
 
 #[derive(Component)]
 pub struct Food;
@@ -39,8 +39,10 @@ pub fn spawn_food(mut commands: Commands, food_query: Query<&Food>, config: Res<
 
 pub fn handle_food_collision(
     mut collision_events: EventReader<CollisionEvent>,
-    head_sensor: Query<(Entity, &HeadSensor)>,
+    head_sensor: Query<(Entity, &HeadSensor, &Parent)>,
     food: Query<Entity, &Food>,
+    head_cell: Query<(&Parent, &Transform, &crate::Direction)>,
+    mut snek: Query<&mut Spawner>,
     mut commands: Commands,
 ) {
     for collision_event in collision_events.iter() {
@@ -49,7 +51,16 @@ pub fn handle_food_collision(
             let head = head_sensor.get(*object);
             if let (Ok(head), Ok(food)) = (head, food) {
                 commands.entity(food).despawn_recursive();
+                let headcell = head_cell.get(head.2.get());
+                if let Ok(headcell) = headcell {
+                    if let Ok(mut snek) = snek.get_mut(headcell.0.get()) {
+                        snek.spawners
+                            .push((headcell.1.translation, headcell.2.clone()));
+                    }
+                }
             }
         }
     }
 }
+
+// pub fn
