@@ -1,12 +1,14 @@
 //! Shows how to render simple primitive shapes with a single color.
 pub mod food;
+pub mod menu;
 pub mod snek;
 pub mod window;
 
 use bevy::{input::touch::TouchPhase, prelude::*, window::WindowResolution};
 use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food};
-use snek::{spawn_new_cell, update_cell_direction, update_head_sensor};
+use menu::{clean_entry_menu, entry_menu, setup_menu};
+use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
 use window::{get_height, get_width};
 
 #[derive(Debug, Resource)]
@@ -86,6 +88,14 @@ pub enum InputsActions {
     Right,
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, States, Default, Clone)]
+pub enum GameStates {
+    #[default]
+    EntryMenu,
+    GamePlay,
+    GameOver,
+}
+
 fn main() {
     let mut app = App::new();
     app.insert_resource(GameConfig {
@@ -93,6 +103,7 @@ fn main() {
         cell_size: (20.0, 20.0),
         game_size: (0, 0),
     })
+    .add_state::<GameStates>()
     .add_event::<ChangeDirection>()
     .add_event::<InputsActions>()
     .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -107,6 +118,10 @@ fn main() {
     // .add_plugins(LogDiagnosticsPlugin::default())
     // .add_plugins(FrameTimeDiagnosticsPlugin::default())
     .add_systems(Startup, (setup, setup_borders).chain())
+    .add_systems(OnEnter(GameStates::EntryMenu), setup_menu)
+    .add_systems(OnEnter(GameStates::GamePlay), setup_snek)
+    .add_systems(OnExit(GameStates::EntryMenu), clean_entry_menu)
+    .add_systems(Update, entry_menu.run_if(in_state(GameStates::EntryMenu)))
     .add_systems(
         Update,
         (
@@ -117,10 +132,11 @@ fn main() {
             handle_input_event,
             update_head_sensor,
             spawn_new_cell,
-        ), // .before(keyboard_input)
-           // .before(update_cell_direction),
-    )
-    .add_systems(Update, (spawn_food, handle_food_collision));
+            spawn_food,
+            handle_food_collision,
+        )
+            .run_if(in_state(GameStates::GamePlay)),
+    );
 
     #[cfg(debug_assertions)]
     debug_plugins(&mut app);
@@ -140,118 +156,6 @@ fn setup(mut config: ResMut<GameConfig>, mut commands: Commands, window: Query<&
         window.resolution.height() as u32,
     );
     commands.spawn(Camera2dBundle::default());
-
-    let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
-    let cell_size = config.cell_size;
-    let initial_position = (0.0, 0.0);
-
-    let player_snake = commands
-        .spawn((
-            Snake {
-                tag: SnakeTag,
-                spatial: Default::default(),
-
-                lastmove: LastMoveId(0),
-                moves: Moves { moves: vec![] },
-                spawners: Spawner { spawners: vec![] },
-            },
-            Player,
-        ))
-        .id();
-    let cell1 = commands
-        .spawn((
-            SnakeCell {
-                cell_tag: CellTag,
-                collider: Collider::cuboid(collider_size.0, collider_size.1),
-                sensor: Sensor,
-                direction: Direction(Vec2 { x: 1.0, y: 0.0 }),
-                sprite: SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::rgb(0.25, 0.25, 0.75),
-                        custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
-                        ..default()
-                    },
-                    transform: Transform::from_translation(Vec3::new(
-                        initial_position.0,
-                        initial_position.1,
-                        0.,
-                    )),
-                    ..default()
-                },
-                move_id: MoveId(0),
-            },
-            Head,
-        ))
-        .with_children(|head| {
-            head.spawn(Collider::cuboid(1.0, collider_size.1))
-                .insert(RigidBody::KinematicPositionBased)
-                .insert(Ccd::enabled())
-                .insert(HeadSensor)
-                .insert(ActiveCollisionTypes::all())
-                .insert(ActiveEvents::COLLISION_EVENTS)
-                .insert(TransformBundle::from_transform(
-                    Transform::from_translation(Vec3 {
-                        x: cell_size.0 / 2.0,
-                        y: 0.0,
-                        z: 0.0,
-                    }),
-                ));
-        })
-        .id();
-
-    let cell2 = commands
-        .spawn((SnakeCell {
-            cell_tag: CellTag,
-
-            collider: Collider::cuboid(collider_size.0, collider_size.1),
-            sensor: Sensor,
-            direction: Direction(Vec2 { x: 1.0, y: 0.0 }),
-
-            sprite: SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgb(0.25, 0.25, 0.75),
-                    custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
-                    ..default()
-                },
-                transform: Transform::from_translation(Vec3::new(
-                    initial_position.0 - cell_size.0,
-                    initial_position.1,
-                    0.,
-                )),
-                ..default()
-            },
-            move_id: MoveId(0),
-        },))
-        .id();
-    let cell3 = commands
-        .spawn((
-            SnakeCell {
-                cell_tag: CellTag,
-
-                collider: Collider::cuboid(collider_size.0, collider_size.1),
-                sensor: Sensor,
-                direction: Direction(Vec2 { x: 1.0, y: 0.0 }),
-                sprite: SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::rgb(0.25, 0.25, 0.75),
-                        custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
-                        ..default()
-                    },
-                    transform: Transform::from_translation(Vec3::new(
-                        initial_position.0 - (cell_size.0 * 2.0),
-                        initial_position.1,
-                        0.,
-                    )),
-                    ..default()
-                },
-                move_id: MoveId(0),
-            },
-            Tail,
-        ))
-        .id();
-    commands
-        .entity(player_snake)
-        .push_children(&[cell1, cell2, cell3]);
 }
 
 fn setup_borders(config: Res<GameConfig>, mut commands: Commands) {

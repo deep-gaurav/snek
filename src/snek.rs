@@ -2,9 +2,123 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
 use crate::{
-    CellTag, ChangeDirection, GameConfig, HeadSensor, MoveId, Moves, SnakeCell, SnakeTag, Spawner,
-    Tail,
+    CellTag, ChangeDirection, GameConfig, Head, HeadSensor, LastMoveId, MoveId, Moves, Player,
+    Snake, SnakeCell, SnakeTag, Spawner, Tail,
 };
+
+pub fn setup_snek(config: Res<GameConfig>, mut commands: Commands) {
+    let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
+    let cell_size = config.cell_size;
+    let initial_position = (0.0, 0.0);
+
+    let player_snake = commands
+        .spawn((
+            Snake {
+                tag: SnakeTag,
+                spatial: Default::default(),
+
+                lastmove: LastMoveId(0),
+                moves: Moves { moves: vec![] },
+                spawners: Spawner { spawners: vec![] },
+            },
+            Player,
+        ))
+        .id();
+    let cell1 = commands
+        .spawn((
+            SnakeCell {
+                cell_tag: CellTag,
+                collider: Collider::cuboid(collider_size.0, collider_size.1),
+                sensor: Sensor,
+                direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
+                sprite: SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::rgb(0.25, 0.25, 0.75),
+                        custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        initial_position.0,
+                        initial_position.1,
+                        0.,
+                    )),
+                    ..default()
+                },
+                move_id: MoveId(0),
+            },
+            Head,
+        ))
+        .with_children(|head| {
+            head.spawn(Collider::cuboid(1.0, collider_size.1))
+                .insert(RigidBody::KinematicPositionBased)
+                .insert(Ccd::enabled())
+                .insert(HeadSensor)
+                .insert(ActiveCollisionTypes::all())
+                .insert(ActiveEvents::COLLISION_EVENTS)
+                .insert(TransformBundle::from_transform(
+                    Transform::from_translation(Vec3 {
+                        x: cell_size.0 / 2.0,
+                        y: 0.0,
+                        z: 0.0,
+                    }),
+                ));
+        })
+        .id();
+
+    let cell2 = commands
+        .spawn((SnakeCell {
+            cell_tag: CellTag,
+
+            collider: Collider::cuboid(collider_size.0, collider_size.1),
+            sensor: Sensor,
+            direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
+
+            sprite: SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgb(0.25, 0.25, 0.75),
+                    custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(
+                    initial_position.0 - cell_size.0,
+                    initial_position.1,
+                    0.,
+                )),
+                ..default()
+            },
+            move_id: MoveId(0),
+        },))
+        .id();
+    let cell3 = commands
+        .spawn((
+            SnakeCell {
+                cell_tag: CellTag,
+
+                collider: Collider::cuboid(collider_size.0, collider_size.1),
+                sensor: Sensor,
+                direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
+                sprite: SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::rgb(0.25, 0.25, 0.75),
+                        custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        initial_position.0 - (cell_size.0 * 2.0),
+                        initial_position.1,
+                        0.,
+                    )),
+                    ..default()
+                },
+                move_id: MoveId(0),
+            },
+            Tail,
+        ))
+        .id();
+    commands
+        .entity(player_snake)
+        .push_children(&[cell1, cell2, cell3]);
+}
 
 pub fn update_cell_direction(
     mut query: Query<
