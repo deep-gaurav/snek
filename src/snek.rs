@@ -14,7 +14,7 @@ pub fn setup_snek(config: Res<GameConfig>, mut commands: Commands) {
     let player_snake = commands
         .spawn((
             Snake {
-                tag: SnakeTag,
+                tag: SnakeTag::SelfPlayerSnake,
                 spatial: Default::default(),
 
                 lastmove: LastMoveId(0),
@@ -27,7 +27,7 @@ pub fn setup_snek(config: Res<GameConfig>, mut commands: Commands) {
     let cell1 = commands
         .spawn((
             SnakeCell {
-                cell_tag: CellTag,
+                cell_tag: CellTag(rand::random()),
                 collider: Collider::cuboid(collider_size.0, collider_size.1),
                 sensor: Sensor,
                 direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
@@ -67,7 +67,7 @@ pub fn setup_snek(config: Res<GameConfig>, mut commands: Commands) {
 
     let cell2 = commands
         .spawn((SnakeCell {
-            cell_tag: CellTag,
+            cell_tag: CellTag(rand::random()),
 
             collider: Collider::cuboid(collider_size.0, collider_size.1),
             sensor: Sensor,
@@ -92,7 +92,7 @@ pub fn setup_snek(config: Res<GameConfig>, mut commands: Commands) {
     let cell3 = commands
         .spawn((
             SnakeCell {
-                cell_tag: CellTag,
+                cell_tag: CellTag(rand::random()),
 
                 collider: Collider::cuboid(collider_size.0, collider_size.1),
                 sensor: Sensor,
@@ -235,7 +235,7 @@ pub fn spawn_new_cell(
                 if distance_vec2.distance(Vec2::ZERO) < 1.0 {
                     let extra_distance = spawn_point.1 .0 * distance_vec2.distance(Vec2::ZERO);
                     let new_cell = SnakeCell {
-                        cell_tag: CellTag,
+                        cell_tag: CellTag(rand::random()),
 
                         collider: Collider::cuboid(collider_size.0, collider_size.1),
                         sensor: Sensor,

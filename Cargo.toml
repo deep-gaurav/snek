@@ -6,9 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-channel = "1.9.0"
+bincode = "1.3.3"
+flate3 = "0.1.21"
+flume = "0.11.0"
+futures = "0.3.28"
 # bevy-inspector-egui = "0.19.0"
 rand = "0.8.5"
+serde = { version = "1.0.188", features = ["derive"] }
 web-sys = { version = "0.3.64", features = ["Element", "Document", "Window"] }
+xwebtransport = { git = "https://github.com/MOZGIII/xwebtransport" }
+xwebtransport-core = { git = "https://github.com/MOZGIII/xwebtransport" }
 
 [dependencies.bevy_rapier2d]
 version = "0.22.0"
@@ -58,7 +66,7 @@ features = [
 
     # Bevy functionality:
     # "subpixel_glyph_atlas", # Subpixel antialiasing for text/fonts
-    # "serialize",            # Support for `serde` Serialize/Deserialize
+    "serialize", # Support for `serde` Serialize/Deserialize
 
     # File formats:
     # "dds", # Alternative DirectX format for GPU textures, instead of KTX2

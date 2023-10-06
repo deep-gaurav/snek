@@ -1,6 +1,6 @@
-//! Shows how to render simple primitive shapes with a single color.
 pub mod food;
 pub mod menu;
+pub mod networking;
 pub mod snek;
 pub mod window;
 
@@ -8,6 +8,10 @@ use bevy::{input::touch::TouchPhase, prelude::*, window::WindowResolution};
 use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
+use networking::{
+    receive_msgs, send_snake_send, update_snake, ConnectionState, SnakeSyncTimer, SnakeUpdate,
+};
+use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
 use window::{get_height, get_width};
 
@@ -37,27 +41,30 @@ pub struct SnakeCell {
     cell_tag: CellTag,
 }
 
-#[derive(Component)]
-pub struct SnakeTag;
+#[derive(Component, PartialEq)]
+pub enum SnakeTag {
+    SelfPlayerSnake,
+    OtherPlayerSnake(u32),
+}
 
 #[derive(Component)]
 pub struct Player;
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Serialize, Deserialize)]
 pub struct Direction(Vec2);
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 pub struct MoveId(u32);
 
 #[derive(Component)]
 pub struct LastMoveId(u32);
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize, Clone)]
 pub struct Moves {
     moves: Vec<(u32, Vec3, Direction)>,
 }
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize, Clone)]
 pub struct Spawner {
     pub spawners: Vec<(Vec3, Direction)>,
 }
@@ -77,8 +84,8 @@ pub struct ChangeDirection {
     head: Entity,
 }
 
-#[derive(Component)]
-pub struct CellTag;
+#[derive(Component, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub struct CellTag(u32);
 
 #[derive(Event)]
 pub enum InputsActions {
@@ -96,6 +103,16 @@ pub enum GameStates {
     GameOver,
 }
 
+impl GameStates {
+    /// Returns `true` if the game states is [`EntryMenu`].
+    ///
+    /// [`EntryMenu`]: GameStates::EntryMenu
+    #[must_use]
+    pub fn is_entry_menu(&self) -> bool {
+        matches!(self, Self::EntryMenu)
+    }
+}
+
 fn main() {
     let mut app = App::new();
     app.insert_resource(GameConfig {
@@ -103,9 +120,14 @@ fn main() {
         cell_size: (20.0, 20.0),
         game_size: (0, 0),
     })
+    .insert_resource(SnakeSyncTimer {
+        timer: Timer::from_seconds(0.2, TimerMode::Repeating),
+    })
+    .insert_resource(ConnectionState::NotConnected)
     .add_state::<GameStates>()
     .add_event::<ChangeDirection>()
     .add_event::<InputsActions>()
+    .add_event::<SnakeUpdate>()
     .add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             resolution: WindowResolution::new(get_width(), get_height()),
@@ -136,6 +158,14 @@ fn main() {
             handle_food_collision,
         )
             .run_if(in_state(GameStates::GamePlay)),
+    )
+    .add_systems(
+        Update,
+        (
+            receive_msgs,
+            send_snake_send.run_if(in_state(GameStates::GamePlay)),
+            update_snake.run_if(in_state(GameStates::GamePlay)),
+        ),
     );
 
     #[cfg(debug_assertions)]
