@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{Collider, CollisionEvent, Sensor};
 
-use crate::{GameConfig, HeadSensor, Spawner};
+use crate::{
+    networking::{ConnectionState, SendMessage, TransportMessage},
+    GameConfig, HeadSensor, Spawner,
+};
 
 #[derive(Component)]
 pub struct Food;
@@ -44,6 +47,7 @@ pub fn handle_food_collision(
     head_cell: Query<(&Parent, &Transform, &crate::Direction)>,
     mut snek: Query<&mut Spawner>,
     mut commands: Commands,
+    connection_handler: Res<ConnectionState>,
 ) {
     for collision_event in collision_events.iter() {
         if let CollisionEvent::Started(object, collider, _flags) = collision_event {
@@ -54,8 +58,17 @@ pub fn handle_food_collision(
                 let headcell = head_cell.get(head.2.get());
                 if let Ok(headcell) = headcell {
                     if let Ok(mut snek) = snek.get_mut(headcell.0.get()) {
-                        snek.spawners
-                            .push((headcell.1.translation, headcell.2.clone()));
+                        let spawn = (headcell.1.translation, headcell.2.clone());
+                        snek.spawners.push(spawn.clone());
+
+                        if let ConnectionState::Connected(connection) = connection_handler.as_ref()
+                        {
+                            if let Err(err) = connection.sender.send(SendMessage::TransportMessage(
+                                TransportMessage::AddSpawn(spawn),
+                            )) {
+                                warn!("{err:?}")
+                            }
+                        }
                     }
                 }
             }

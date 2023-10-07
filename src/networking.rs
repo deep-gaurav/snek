@@ -10,13 +10,14 @@ use bevy::{
 };
 use bevy_rapier2d::prelude::{Collider, Sensor};
 use flume::{Receiver, Sender};
+use futures::task::Spawn;
 use serde::{Deserialize, Serialize};
 use xwebtransport::current::Connection;
 use xwebtransport_core::{datagram::Receive, Connecting, EndpointConnect};
 
 use crate::{
-    CellTag, Direction, GameConfig, GameStates, LastMoveId, MoveId, Moves, Snake, SnakeCell,
-    SnakeTag, Spawner,
+    CellTag, Direction, GameConfig, GameStates, LastMoveId, Move, MoveId, Moves, Snake, SnakeCell,
+    SnakeTag, SpawnDetail, Spawner,
 };
 
 pub enum SendMessage {
@@ -26,6 +27,8 @@ pub enum SendMessage {
 #[derive(Serialize, Deserialize)]
 pub enum TransportMessage {
     SnakeUpdate(SnakeDetails),
+    AddMove(Move),
+    AddSpawn(SpawnDetail),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,8 +75,8 @@ pub struct SnakeSyncTimer {
 }
 
 pub struct ConnectionHandler {
-    sender: Sender<SendMessage>,
-    receiver: Receiver<ReceiveMessage>,
+    pub sender: Sender<SendMessage>,
+    pub receiver: Receiver<ReceiveMessage>,
 }
 
 #[derive(Component)]
@@ -83,6 +86,18 @@ pub struct LastUpdatedAt(f64);
 pub struct SnakeUpdate {
     user_id: u32,
     snake_details: SnakeDetails,
+}
+
+#[derive(Event)]
+pub struct AddMove {
+    user_id: u32,
+    _move: Move,
+}
+
+#[derive(Event)]
+pub struct AddSpawn {
+    user_id: u32,
+    spawn: SpawnDetail,
 }
 
 #[derive(Component)]
@@ -162,6 +177,8 @@ pub fn receive_msgs(
     mut next_state: ResMut<NextState<GameStates>>,
     current_state: Res<State<GameStates>>,
     mut snake_update: EventWriter<SnakeUpdate>,
+    mut add_move: EventWriter<AddMove>,
+    mut add_spawn: EventWriter<AddSpawn>,
 ) {
     match connection_handler.as_ref() {
         ConnectionState::NotConnected => {}
@@ -177,12 +194,19 @@ pub fn receive_msgs(
                         if let RelayMessage::UserMessage(user_id, msg) = msg {
                             let transport_msg = bincode::deserialize::<TransportMessage>(&msg);
                             if let Ok(transport_msg) = transport_msg {
-                                if let TransportMessage::SnakeUpdate(snake_details) = transport_msg
-                                {
-                                    snake_update.send(SnakeUpdate {
-                                        user_id: user_id,
-                                        snake_details,
-                                    })
+                                match transport_msg {
+                                    TransportMessage::SnakeUpdate(snake_details) => snake_update
+                                        .send(SnakeUpdate {
+                                            user_id: user_id,
+                                            snake_details,
+                                        }),
+                                    TransportMessage::AddMove(_move) => {
+                                        add_move.send(AddMove { user_id, _move })
+                                    }
+
+                                    TransportMessage::AddSpawn(spawn) => {
+                                        add_spawn.send(AddSpawn { user_id, spawn })
+                                    }
                                 }
                             }
                         }
@@ -342,6 +366,36 @@ pub fn update_snake(
                     }
                 })
                 .id();
+        }
+    }
+}
+
+pub fn sync_add_move(
+    mut moves: Query<(&mut Moves, &SnakeTag)>,
+    mut add_move: EventReader<AddMove>,
+) {
+    for _move in add_move.iter() {
+        for (mut moves, snake) in moves.iter_mut() {
+            if let SnakeTag::OtherPlayerSnake(id) = snake {
+                if id == &_move.user_id {
+                    moves.moves.push(_move._move.clone());
+                }
+            }
+        }
+    }
+}
+
+pub fn sync_add_spawner(
+    mut spawner: Query<(&mut Spawner, &SnakeTag)>,
+    mut add_spawn: EventReader<AddSpawn>,
+) {
+    for spawn in add_spawn.iter() {
+        for (mut spawner, snake) in spawner.iter_mut() {
+            if let SnakeTag::OtherPlayerSnake(id) = snake {
+                if id == &spawn.user_id {
+                    spawner.spawners.push(spawn.spawn.clone());
+                }
+            }
         }
     }
 }

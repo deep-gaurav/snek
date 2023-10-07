@@ -9,7 +9,8 @@ use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
-    receive_msgs, send_snake_send, update_snake, ConnectionState, SnakeSyncTimer, SnakeUpdate,
+    receive_msgs, send_snake_send, sync_add_move, sync_add_spawner, update_snake, AddMove,
+    AddSpawn, ConnectionState, SendMessage, SnakeSyncTimer, SnakeUpdate, TransportMessage,
 };
 use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
@@ -59,14 +60,17 @@ pub struct MoveId(u32);
 #[derive(Component)]
 pub struct LastMoveId(u32);
 
+pub type Move = (u32, Vec3, Direction);
 #[derive(Component, Serialize, Deserialize, Clone)]
 pub struct Moves {
-    moves: Vec<(u32, Vec3, Direction)>,
+    moves: Vec<Move>,
 }
+
+pub type SpawnDetail = (Vec3, Direction);
 
 #[derive(Component, Serialize, Deserialize, Clone)]
 pub struct Spawner {
-    pub spawners: Vec<(Vec3, Direction)>,
+    pub spawners: Vec<SpawnDetail>,
 }
 
 #[derive(Component)]
@@ -121,13 +125,15 @@ fn main() {
         game_size: (0, 0),
     })
     .insert_resource(SnakeSyncTimer {
-        timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+        timer: Timer::from_seconds(0.5, TimerMode::Repeating),
     })
     .insert_resource(ConnectionState::NotConnected)
     .add_state::<GameStates>()
     .add_event::<ChangeDirection>()
     .add_event::<InputsActions>()
     .add_event::<SnakeUpdate>()
+    .add_event::<AddSpawn>()
+    .add_event::<AddMove>()
     .add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             resolution: WindowResolution::new(get_width(), get_height()),
@@ -164,7 +170,7 @@ fn main() {
         (
             receive_msgs,
             send_snake_send.run_if(in_state(GameStates::GamePlay)),
-            update_snake.run_if(in_state(GameStates::GamePlay)),
+            (update_snake, sync_add_move, sync_add_spawner).run_if(in_state(GameStates::GamePlay)),
         ),
     );
 
@@ -258,6 +264,7 @@ fn handle_input_event(
     mut query: Query<(Entity, &mut LastMoveId, &mut Moves), With<Player>>,
     mut head: Query<(&Parent, &Transform, &mut Direction, &mut MoveId, Entity), With<Head>>,
     mut ev_change_direction: EventWriter<ChangeDirection>,
+    connection_handler: Res<ConnectionState>,
 ) {
     let Some(event) = event.iter().next() else {
         return;
@@ -279,7 +286,7 @@ fn handle_input_event(
             && (head_direction.0 + direction) != Vec2::ZERO
         {
             last_move.0 += 1;
-            moves.moves.push((
+            let _move = (
                 last_move.0,
                 head.translation
                     + Vec3 {
@@ -288,7 +295,15 @@ fn handle_input_event(
                         z: 0.0,
                     },
                 Direction(direction),
-            ));
+            );
+            moves.moves.push(_move.clone());
+            if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
+                if let Err(err) = connection.sender.send(SendMessage::TransportMessage(
+                    TransportMessage::AddMove(_move),
+                )) {
+                    warn!("{err:?}")
+                }
+            }
             ev_change_direction.send(ChangeDirection {
                 head: head_id,
                 direction,
