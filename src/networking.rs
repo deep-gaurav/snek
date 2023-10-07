@@ -16,6 +16,7 @@ use xwebtransport::current::Connection;
 use xwebtransport_core::{datagram::Receive, Connecting, EndpointConnect};
 
 use crate::{
+    food::{spawn_food, Food},
     CellTag, Direction, GameConfig, GameStates, Host, LastMoveId, Move, MoveId, Moves, Snake,
     SnakeCell, SnakeTag, SpawnDetail, Spawner,
 };
@@ -32,6 +33,8 @@ pub enum TransportMessage {
     AddMove(Move),
     AddSpawn(SpawnDetail),
     StartGame,
+    SpawnFood(u32, Vec2),
+    DespawnFood(u32),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -195,6 +198,7 @@ pub fn connect_transport(room_id: &str, mut connection_handler: ResMut<Connectio
 }
 
 pub fn receive_msgs(
+    config: Res<GameConfig>,
     mut connection_handler: ResMut<ConnectionState>,
     mut next_state: ResMut<NextState<GameStates>>,
     current_state: Res<State<GameStates>>,
@@ -203,6 +207,7 @@ pub fn receive_msgs(
     mut add_spawn: EventWriter<AddSpawn>,
     mut players_changed_ev: EventWriter<PlayersChanged>,
     mut host: Query<Entity, With<Host>>,
+    food: Query<(Entity, &Food)>,
     mut commands: Commands,
 ) {
     match connection_handler.as_mut() {
@@ -306,6 +311,20 @@ pub fn receive_msgs(
                                             }
                                             TransportMessage::StartGame => {
                                                 next_state.set(GameStates::GamePlay);
+                                            }
+                                            TransportMessage::SpawnFood(food_id, food_pos) => {
+                                                commands.spawn(spawn_food(
+                                                    food_id,
+                                                    config.cell_size,
+                                                    food_pos.x,
+                                                    food_pos.y,
+                                                ));
+                                            }
+                                            TransportMessage::DespawnFood(id) => {
+                                                let food = food.iter().find(|f| f.1 .0 == id);
+                                                if let Some(food) = food {
+                                                    commands.entity(food.0).despawn_recursive();
+                                                }
                                             }
                                         }
                                     }

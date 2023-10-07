@@ -7,7 +7,7 @@ pub mod window;
 
 use bevy::{input::touch::TouchPhase, prelude::*, window::WindowResolution};
 use bevy_rapier2d::{na::ComplexField, prelude::*};
-use food::{handle_food_collision, spawn_food};
+use food::{handle_food_collision, spawn_food_system};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
@@ -174,7 +174,7 @@ fn main() {
             handle_input_event,
             update_head_sensor,
             spawn_new_cell,
-            spawn_food,
+            spawn_food_system,
             handle_food_collision,
         )
             .run_if(in_state(GameStates::GamePlay)),
