@@ -412,11 +412,22 @@ pub fn update_snake(
     mut move_id: Query<&mut MoveId>,
     mut direction: Query<&mut Direction>,
     mut transmform: Query<&mut Transform, Or<(With<CellTag>, With<SnakeTag>)>>,
+    connection_handler: Res<ConnectionState>,
 ) {
+    let ConnectionState::Connected(connection) = connection_handler.as_ref() else {
+        return;
+    };
     let cell_size = config.cell_size;
     let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
 
     for event in snake_update.into_iter() {
+        let Some(player) = connection
+            .players
+            .iter()
+            .find(|p| p.user_id == event.user_id)
+        else {
+            continue;
+        };
         let snake = snake
             .iter()
             .find(|snake| snake.1 == &SnakeTag::OtherPlayerSnake(event.user_id));
@@ -442,7 +453,7 @@ pub fn update_snake(
                             direction: cell.direction.clone(),
                             sprite: SpriteBundle {
                                 sprite: Sprite {
-                                    color: Color::rgb(0.25, 0.25, 0.75),
+                                    color: player.color,
                                     custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
                                     ..default()
                                 },
@@ -477,7 +488,7 @@ pub fn update_snake(
                             direction: cell.direction.clone(),
                             sprite: SpriteBundle {
                                 sprite: Sprite {
-                                    color: Color::rgb(0.25, 0.25, 0.75),
+                                    color: player.color,
                                     custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
                                     ..default()
                                 },
