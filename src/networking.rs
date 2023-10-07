@@ -30,6 +30,7 @@ pub enum TransportMessage {
 
 #[derive(Serialize, Deserialize)]
 pub struct SnakeDetails {
+    elaps: f64,
     transform: Transform,
     moves: Moves,
     spawners: Spawner,
@@ -74,6 +75,9 @@ pub struct ConnectionHandler {
     sender: Sender<SendMessage>,
     receiver: Receiver<ReceiveMessage>,
 }
+
+#[derive(Component)]
+pub struct LastUpdatedAt(f64);
 
 #[derive(Event)]
 pub struct SnakeUpdate {
@@ -232,6 +236,7 @@ pub fn send_snake_send(
         })
         .collect();
     let snake_details = SnakeDetails {
+        elaps: time.elapsed_seconds_f64(),
         transform: snake_tranform,
         cells: snake_cells,
         moves,
@@ -252,7 +257,7 @@ pub fn send_snake_send(
 pub fn update_snake(
     mut snake_update: EventReader<SnakeUpdate>,
     mut commands: Commands,
-    snake: Query<(Entity, &SnakeTag)>,
+    snake: Query<(Entity, &SnakeTag, &LastUpdatedAt)>,
     cells: Query<(Entity, &CellTag)>,
     config: Res<GameConfig>,
     mut moves: Query<&mut Moves>,
@@ -269,6 +274,9 @@ pub fn update_snake(
             .iter()
             .find(|snake| snake.1 == &SnakeTag::OtherPlayerSnake(event.user_id));
         if let Some(snake) = snake {
+            if (snake.2 .0 > event.snake_details.elaps) {
+                return;
+            }
             *transmform.get_mut(snake.0).unwrap() = event.snake_details.transform;
             *moves.get_mut(snake.0).unwrap() = event.snake_details.moves.clone();
             *spawners.get_mut(snake.0).unwrap() = event.snake_details.spawners.clone();
@@ -302,14 +310,17 @@ pub fn update_snake(
             }
         } else {
             let snake = commands
-                .spawn((Snake {
-                    tag: SnakeTag::OtherPlayerSnake(event.user_id),
-                    spatial: SpatialBundle::from_transform(event.snake_details.transform),
+                .spawn((
+                    Snake {
+                        tag: SnakeTag::OtherPlayerSnake(event.user_id),
+                        spatial: SpatialBundle::from_transform(event.snake_details.transform),
 
-                    lastmove: LastMoveId(0),
-                    moves: event.snake_details.moves.clone(),
-                    spawners: event.snake_details.spawners.clone(),
-                },))
+                        lastmove: LastMoveId(0),
+                        moves: event.snake_details.moves.clone(),
+                        spawners: event.snake_details.spawners.clone(),
+                    },
+                    LastUpdatedAt(event.snake_details.elaps),
+                ))
                 .with_children(|parent| {
                     for cell in event.snake_details.cells.iter() {
                         parent.spawn(SnakeCell {

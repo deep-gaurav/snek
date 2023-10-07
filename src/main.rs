@@ -121,7 +121,7 @@ fn main() {
         game_size: (0, 0),
     })
     .insert_resource(SnakeSyncTimer {
-        timer: Timer::from_seconds(0.2, TimerMode::Repeating),
+        timer: Timer::from_seconds(0.1, TimerMode::Repeating),
     })
     .insert_resource(ConnectionState::NotConnected)
     .add_state::<GameStates>()
