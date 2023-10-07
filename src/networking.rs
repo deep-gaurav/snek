@@ -16,8 +16,8 @@ use xwebtransport::current::Connection;
 use xwebtransport_core::{datagram::Receive, Connecting, EndpointConnect};
 
 use crate::{
-    CellTag, Direction, GameConfig, GameStates, LastMoveId, Move, MoveId, Moves, Snake, SnakeCell,
-    SnakeTag, SpawnDetail, Spawner,
+    CellTag, Direction, GameConfig, GameStates, Host, LastMoveId, Move, MoveId, Moves, Snake,
+    SnakeCell, SnakeTag, SpawnDetail, Spawner,
 };
 
 pub enum SendMessage {
@@ -26,9 +26,12 @@ pub enum SendMessage {
 
 #[derive(Serialize, Deserialize)]
 pub enum TransportMessage {
+    Noop,
+    InformPlayers(Vec<PlayerProp>),
     SnakeUpdate(SnakeDetails),
     AddMove(Move),
     AddSpawn(SpawnDetail),
+    StartGame,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -50,6 +53,7 @@ pub struct SnakeCellDetails {
 
 #[derive(Debug, serde::Deserialize)]
 pub enum RelayMessage {
+    RoomJoined(u32),
     UserConnected(u32),
     UserDisconnected(u32),
     UserMessage(u32, Vec<u8>),
@@ -75,8 +79,23 @@ pub struct SnakeSyncTimer {
 }
 
 pub struct ConnectionHandler {
+    pub self_id: Option<u32>,
+    pub room_id: String,
+    pub players: Vec<PlayerProp>,
     pub sender: Sender<SendMessage>,
     pub receiver: Receiver<ReceiveMessage>,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlayerProp {
+    pub user_id: u32,
+    pub color: Color,
+}
+
+#[derive(Event)]
+pub struct PlayersChanged {
+    pub players: Vec<PlayerProp>,
+    pub self_player: Option<u32>,
 }
 
 #[derive(Component)]
@@ -110,12 +129,12 @@ pub fn connect_transport(room_id: &str, mut connection_handler: ResMut<Connectio
     };
     let (sender_tx, sender_rx) = flume::unbounded();
     let (receiver_tx, receiver_rx) = flume::unbounded();
-    let room_id = room_id.to_string();
+    let room_id_c = room_id.to_string();
     let task = thread_pool
         .spawn(async move {
             let connection = endpoint
                 .connect(&format!(
-                    "https://web-room-relay.deepwith.in:4433/room/{room_id}"
+                    "https://web-room-relay.deepwith.in:4433/room/{room_id_c}",
                 ))
                 .await;
             if let Ok(connection) = connection {
@@ -167,50 +186,135 @@ pub fn connect_transport(room_id: &str, mut connection_handler: ResMut<Connectio
         })
         .detach();
     *connection_handler.as_mut() = ConnectionState::Connected(ConnectionHandler {
+        self_id: None,
+        players: vec![],
         sender: sender_tx,
         receiver: receiver_rx,
+        room_id: room_id.to_string(),
     });
 }
 
 pub fn receive_msgs(
-    connection_handler: Res<ConnectionState>,
+    mut connection_handler: ResMut<ConnectionState>,
     mut next_state: ResMut<NextState<GameStates>>,
     current_state: Res<State<GameStates>>,
     mut snake_update: EventWriter<SnakeUpdate>,
     mut add_move: EventWriter<AddMove>,
     mut add_spawn: EventWriter<AddSpawn>,
+    mut players_changed_ev: EventWriter<PlayersChanged>,
+    mut host: Query<Entity, With<Host>>,
+    mut commands: Commands,
 ) {
-    match connection_handler.as_ref() {
+    match connection_handler.as_mut() {
         ConnectionState::NotConnected => {}
         ConnectionState::Connected(connection) => {
             for msg in connection.receiver.try_iter() {
                 print!("Connection established");
-                if current_state.is_entry_menu() && msg == ReceiveMessage::ConnectionEstablished {
-                    next_state.set(GameStates::GamePlay);
-                }
-                if let ReceiveMessage::DatagramReceived(data) = msg {
-                    let msg = bincode::deserialize::<RelayMessage>(&data);
-                    if let Ok(msg) = msg {
-                        if let RelayMessage::UserMessage(user_id, msg) = msg {
-                            let transport_msg = bincode::deserialize::<TransportMessage>(&msg);
-                            if let Ok(transport_msg) = transport_msg {
-                                match transport_msg {
-                                    TransportMessage::SnakeUpdate(snake_details) => snake_update
-                                        .send(SnakeUpdate {
-                                            user_id: user_id,
-                                            snake_details,
-                                        }),
-                                    TransportMessage::AddMove(_move) => {
-                                        add_move.send(AddMove { user_id, _move })
+                match msg {
+                    ReceiveMessage::ConnectionEstablished => {
+                        info!("Connection established");
+                        next_state.set(GameStates::Lobby);
+                    }
+                    ReceiveMessage::DatagramReceived(data) => {
+                        let msg = bincode::deserialize::<RelayMessage>(&data);
+                        if let Ok(msg) = msg {
+                            match msg {
+                                RelayMessage::RoomJoined(user_id) => {
+                                    connection.sender.send(SendMessage::TransportMessage(
+                                        TransportMessage::Noop,
+                                    ));
+                                    info!("Joined room with id {}", user_id);
+                                    connection.self_id = Some(user_id);
+                                    if connection.players.is_empty() {
+                                        let color = Color::Hsla {
+                                            hue: rand::random::<f32>() * 360.,
+                                            saturation: 1.,
+                                            lightness: 0.5,
+                                            alpha: 1.,
+                                        };
+                                        connection.players.push(PlayerProp { user_id, color });
                                     }
+                                    players_changed_ev.send(PlayersChanged {
+                                        players: connection.players.clone(),
+                                        self_player: connection.self_id,
+                                    });
+                                }
+                                RelayMessage::UserConnected(id) => {
+                                    info!("User connected {id}");
+                                    if !host.is_empty() {
+                                        let color = Color::Hsla {
+                                            hue: rand::random::<f32>() * 360.,
+                                            saturation: 1.,
+                                            lightness: 0.5,
+                                            alpha: 1.,
+                                        };
+                                        connection.players.push(PlayerProp { user_id: id, color });
+                                        players_changed_ev.send(PlayersChanged {
+                                            players: connection.players.clone(),
+                                            self_player: connection.self_id,
+                                        });
+                                        connection.sender.send(SendMessage::TransportMessage(
+                                            TransportMessage::InformPlayers(
+                                                connection.players.clone(),
+                                            ),
+                                        ));
+                                    }
+                                }
+                                RelayMessage::UserDisconnected(id) => {
+                                    info!("User Disconnected {id}");
+                                    if !host.is_empty() {
+                                        let p_index =
+                                            connection.players.iter().position(|p| p.user_id == id);
+                                        if let Some(player_index) = p_index {
+                                            connection.players.remove(player_index);
+                                            players_changed_ev.send(PlayersChanged {
+                                                players: connection.players.clone(),
+                                                self_player: connection.self_id,
+                                            });
+                                            connection.sender.send(SendMessage::TransportMessage(
+                                                TransportMessage::InformPlayers(
+                                                    connection.players.clone(),
+                                                ),
+                                            ));
+                                        }
+                                    }
+                                }
+                                RelayMessage::UserMessage(user_id, msg) => {
+                                    let transport_msg =
+                                        bincode::deserialize::<TransportMessage>(&msg);
+                                    if let Ok(transport_msg) = transport_msg {
+                                        match transport_msg {
+                                            TransportMessage::Noop => {}
+                                            TransportMessage::SnakeUpdate(snake_details) => {
+                                                snake_update.send(SnakeUpdate {
+                                                    user_id: user_id,
+                                                    snake_details,
+                                                })
+                                            }
+                                            TransportMessage::AddMove(_move) => {
+                                                add_move.send(AddMove { user_id, _move })
+                                            }
 
-                                    TransportMessage::AddSpawn(spawn) => {
-                                        add_spawn.send(AddSpawn { user_id, spawn })
+                                            TransportMessage::AddSpawn(spawn) => {
+                                                add_spawn.send(AddSpawn { user_id, spawn })
+                                            }
+                                            TransportMessage::InformPlayers(players) => {
+                                                connection.players = players;
+                                                for host in host.iter() {
+                                                    commands.entity(host).despawn();
+                                                }
+                                            }
+                                            TransportMessage::StartGame => {
+                                                next_state.set(GameStates::GamePlay);
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    ReceiveMessage::ConnectionError => {}
+                    ReceiveMessage::ChannelReceiveError => {}
                 }
             }
         }

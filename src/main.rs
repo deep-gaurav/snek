@@ -1,4 +1,5 @@
 pub mod food;
+pub mod lobby;
 pub mod menu;
 pub mod networking;
 pub mod snek;
@@ -7,10 +8,12 @@ pub mod window;
 use bevy::{input::touch::TouchPhase, prelude::*, window::WindowResolution};
 use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food};
+use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
     receive_msgs, send_snake_send, sync_add_move, sync_add_spawner, update_snake, AddMove,
-    AddSpawn, ConnectionState, SendMessage, SnakeSyncTimer, SnakeUpdate, TransportMessage,
+    AddSpawn, ConnectionState, PlayersChanged, SendMessage, SnakeSyncTimer, SnakeUpdate,
+    TransportMessage,
 };
 use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
@@ -31,6 +34,9 @@ pub struct Snake {
     moves: Moves,
     spawners: Spawner,
 }
+
+#[derive(Component)]
+pub struct Host;
 
 #[derive(Bundle)]
 pub struct SnakeCell {
@@ -103,6 +109,7 @@ pub enum InputsActions {
 pub enum GameStates {
     #[default]
     EntryMenu,
+    Lobby,
     GamePlay,
     GameOver,
 }
@@ -134,6 +141,7 @@ fn main() {
     .add_event::<SnakeUpdate>()
     .add_event::<AddSpawn>()
     .add_event::<AddMove>()
+    .add_event::<PlayersChanged>()
     .add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             resolution: WindowResolution::new(get_width(), get_height()),
@@ -150,6 +158,12 @@ fn main() {
     .add_systems(OnEnter(GameStates::GamePlay), setup_snek)
     .add_systems(OnExit(GameStates::EntryMenu), clean_entry_menu)
     .add_systems(Update, entry_menu.run_if(in_state(GameStates::EntryMenu)))
+    .add_systems(OnEnter(GameStates::Lobby), setup_lobby_menu)
+    .add_systems(OnExit(GameStates::Lobby), clean_lobby)
+    .add_systems(
+        Update,
+        (lobby_handle_button, update_player_details).run_if(in_state(GameStates::Lobby)),
+    )
     .add_systems(
         Update,
         (
@@ -186,6 +200,7 @@ fn debug_plugins(app: &mut App) {
 }
 
 fn setup(mut config: ResMut<GameConfig>, mut commands: Commands, window: Query<&Window>) {
+    commands.spawn(Host);
     let window = window.single();
     config.game_size = (
         window.resolution.width() as u32,
