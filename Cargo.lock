@@ -3313,6 +3313,7 @@ dependencies = [
  "futures",
  "rand",
  "serde",
+ "wasm-bindgen-futures",
  "web-sys",
  "xwebtransport",
  "xwebtransport-core",

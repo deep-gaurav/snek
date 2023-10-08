@@ -11,9 +11,9 @@ use food::{handle_food_collision, spawn_food_system};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
-    receive_msgs, send_snake_send, sync_add_move, sync_add_spawner, update_snake, AddMove,
-    AddSpawn, ConnectionState, PlayersChanged, SendMessage, SnakeSyncTimer, SnakeUpdate,
-    TransportMessage,
+    ping_send, receive_msgs, send_snake_send, sync_add_move, sync_add_spawner, update_snake,
+    AddMove, AddSpawn, ConnectionState, PingTimer, PlayersChanged, SendMessage, SnakeSyncTimer,
+    SnakeUpdate, TransportMessage,
 };
 use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
@@ -144,6 +144,9 @@ fn main() {
     .insert_resource(SnakeSyncTimer {
         timer: Timer::from_seconds(0.5, TimerMode::Repeating),
     })
+    .insert_resource(PingTimer {
+        timer: Timer::from_seconds(1., TimerMode::Repeating),
+    })
     .insert_resource(ConnectionState::NotConnected)
     .add_state::<GameStates>()
     .add_event::<ChangeDirection>()
@@ -193,6 +196,7 @@ fn main() {
         Update,
         (
             receive_msgs,
+            ping_send,
             send_snake_send.run_if(in_state(GameStates::GamePlay)),
             (update_snake, sync_add_move, sync_add_spawner).run_if(in_state(GameStates::GamePlay)),
         ),

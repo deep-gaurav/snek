@@ -13,7 +13,7 @@ use flume::{Receiver, Sender};
 use futures::task::Spawn;
 use serde::{Deserialize, Serialize};
 use xwebtransport::current::Connection;
-use xwebtransport_core::{datagram::Receive, Connecting, EndpointConnect};
+use xwebtransport_core::{datagram::Receive, AcceptUniStream, Connecting, EndpointConnect};
 
 use crate::{
     food::{spawn_food, Food},
@@ -37,6 +37,8 @@ pub enum TransportMessage {
     StartGame(PointInTime),
     SpawnFood(u32, Vec2),
     DespawnFood(u32),
+    Ping(f32),
+    Pong(f32),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -79,6 +81,11 @@ pub enum ConnectionState {
 
 #[derive(Resource)]
 pub struct SnakeSyncTimer {
+    pub timer: Timer,
+}
+
+#[derive(Resource)]
+pub struct PingTimer {
     pub timer: Timer,
 }
 
@@ -303,6 +310,16 @@ pub fn receive_msgs(
                                     if let Ok(transport_msg) = transport_msg {
                                         match transport_msg {
                                             TransportMessage::Noop => {}
+                                            TransportMessage::Ping(t) => {
+                                                connection.sender.send(
+                                                    SendMessage::TransportMessage(
+                                                        TransportMessage::Pong(t),
+                                                    ),
+                                                );
+                                            }
+                                            TransportMessage::Pong(t) => {
+                                                info!("Ping {}", time.elapsed_seconds() - t);
+                                            }
                                             TransportMessage::SnakeUpdate(
                                                 update_time,
                                                 snake_details,
@@ -362,6 +379,23 @@ pub fn receive_msgs(
                     ReceiveMessage::ChannelReceiveError => {}
                 }
             }
+        }
+    }
+}
+
+pub fn ping_send(
+    mut ping_tick: ResMut<PingTimer>,
+    time: Res<Time>,
+    connection_handler: Res<ConnectionState>,
+) {
+    ping_tick.timer.tick(time.delta());
+    if ping_tick.timer.finished() {
+        if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
+            connection
+                .sender
+                .send(SendMessage::TransportMessage(TransportMessage::Ping(
+                    time.elapsed_seconds(),
+                )));
         }
     }
 }
