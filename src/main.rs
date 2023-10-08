@@ -290,6 +290,7 @@ fn handle_input_event(
     mut head: Query<(&Parent, &Transform, &mut Direction, &mut MoveId, Entity), With<Head>>,
     mut ev_change_direction: EventWriter<ChangeDirection>,
     connection_handler: Res<ConnectionState>,
+    time: Res<Time>,
 ) {
     let Some(event) = event.iter().next() else {
         return;
@@ -324,7 +325,7 @@ fn handle_input_event(
             moves.moves.push(_move.clone());
             if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
                 if let Err(err) = connection.sender.send(SendMessage::TransportMessage(
-                    TransportMessage::AddMove(_move),
+                    TransportMessage::AddMove(time.elapsed_seconds(), _move),
                 )) {
                     warn!("{err:?}")
                 }

@@ -32,17 +32,15 @@ pub enum TransportMessage {
     Noop,
     InformPlayers(Vec<PlayerProp>),
     SnakeUpdate(PointInTime, SnakeDetails),
-    AddMove(Move),
+    AddMove(PointInTime, Move),
     AddSpawn(SpawnDetail),
     StartGame(PointInTime),
-    GameStarted(PointInTime),
     SpawnFood(u32, Vec2),
     DespawnFood(u32),
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct SnakeDetails {
-    elaps: f64,
     transform: Transform,
     moves: Moves,
     spawners: Spawner,
@@ -94,6 +92,7 @@ pub struct ConnectionHandler {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerProp {
+    pub last_update_time: Option<PointInTime>,
     pub start_time: Option<(PointInTime, PointInTime)>,
     pub user_id: u32,
     pub color: Color,
@@ -105,9 +104,6 @@ pub struct PlayersChanged {
     pub self_player: Option<u32>,
 }
 
-#[derive(Component)]
-pub struct LastUpdatedAt(f64);
-
 #[derive(Event)]
 pub struct SnakeUpdate {
     update_time: PointInTime,
@@ -117,6 +113,7 @@ pub struct SnakeUpdate {
 
 #[derive(Event)]
 pub struct AddMove {
+    update_time: PointInTime,
     user_id: u32,
     _move: Move,
 }
@@ -244,6 +241,7 @@ pub fn receive_msgs(
                                             alpha: 1.,
                                         };
                                         connection.players.push(PlayerProp {
+                                            last_update_time: None,
                                             user_id,
                                             color,
                                             start_time: None,
@@ -267,6 +265,7 @@ pub fn receive_msgs(
                                             user_id: id,
                                             color,
                                             start_time: None,
+                                            last_update_time: None,
                                         });
                                         players_changed_ev.send(PlayersChanged {
                                             players: connection.players.clone(),
@@ -312,8 +311,19 @@ pub fn receive_msgs(
                                                 user_id: user_id,
                                                 snake_details,
                                             }),
-                                            TransportMessage::AddMove(_move) => {
-                                                add_move.send(AddMove { user_id, _move })
+                                            TransportMessage::AddMove(update_time, _move) => {
+                                                let player = connection
+                                                    .players
+                                                    .iter_mut()
+                                                    .find(|p| p.user_id == user_id);
+                                                if let Some(player) = player {
+                                                    player.last_update_time = Some(update_time);
+                                                };
+                                                add_move.send(AddMove {
+                                                    user_id,
+                                                    _move,
+                                                    update_time,
+                                                })
                                             }
 
                                             TransportMessage::AddSpawn(spawn) => {
@@ -326,14 +336,6 @@ pub fn receive_msgs(
                                                 }
                                             }
                                             TransportMessage::StartGame(start_time) => {
-                                                let host = connection
-                                                    .players
-                                                    .iter_mut()
-                                                    .find(|p| p.user_id == user_id);
-                                                if let Some(host) = host {
-                                                    host.start_time =
-                                                        Some((start_time, time.elapsed_seconds()));
-                                                }
                                                 next_state.set(GameStates::GamePlay);
                                             }
                                             TransportMessage::SpawnFood(food_id, food_pos) => {
@@ -348,16 +350,6 @@ pub fn receive_msgs(
                                                 let food = food.iter().find(|f| f.1 .0 == id);
                                                 if let Some(food) = food {
                                                     commands.entity(food.0).despawn_recursive();
-                                                }
-                                            }
-                                            TransportMessage::GameStarted(start_time) => {
-                                                let player = connection
-                                                    .players
-                                                    .iter_mut()
-                                                    .find(|p| p.user_id == user_id);
-                                                if let Some(player) = player {
-                                                    player.start_time =
-                                                        Some((start_time, time.elapsed_seconds()));
                                                 }
                                             }
                                         }
@@ -417,7 +409,6 @@ pub fn send_snake_send(
         })
         .collect();
     let snake_details = SnakeDetails {
-        elaps: time.elapsed_seconds_f64(),
         transform: snake_tranform,
         cells: snake_cells,
         moves,
@@ -438,7 +429,7 @@ pub fn send_snake_send(
 pub fn update_snake(
     mut snake_update: EventReader<SnakeUpdate>,
     mut commands: Commands,
-    snake: Query<(Entity, &SnakeTag, &LastUpdatedAt)>,
+    mut snake: Query<(Entity, &SnakeTag)>,
     cells: Query<(Entity, &CellTag)>,
     config: Res<GameConfig>,
     mut moves: Query<&mut Moves>,
@@ -446,10 +437,10 @@ pub fn update_snake(
     mut move_id: Query<&mut MoveId>,
     mut direction: Query<&mut Direction>,
     mut transmform: Query<&mut Transform, Or<(With<CellTag>, With<SnakeTag>)>>,
-    connection_handler: Res<ConnectionState>,
+    mut connection_handler: ResMut<ConnectionState>,
     time: Res<Time>,
 ) {
-    let ConnectionState::Connected(connection) = connection_handler.as_ref() else {
+    let ConnectionState::Connected(connection) = connection_handler.as_mut() else {
         return;
     };
     let cell_size = config.cell_size;
@@ -458,18 +449,24 @@ pub fn update_snake(
     for event in snake_update.into_iter() {
         let Some(player) = connection
             .players
-            .iter()
+            .iter_mut()
             .find(|p| p.user_id == event.user_id)
         else {
             continue;
         };
-        let snake = snake
-            .iter()
-            .find(|snake| snake.1 == &SnakeTag::OtherPlayerSnake(event.user_id));
-        if let Some(snake) = snake {
-            if (snake.2 .0 > event.snake_details.elaps) {
-                return;
+        if let Some(mut last_up) = player.last_update_time {
+            if event.update_time < last_up {
+                info!("Skipping late event");
+                continue;
             }
+            player.last_update_time = Some(event.update_time);
+        } else {
+            player.last_update_time = Some(event.update_time);
+        }
+        let snake = snake
+            .iter_mut()
+            .find(|snake| snake.1 == &SnakeTag::OtherPlayerSnake(event.user_id));
+        if let Some(mut snake) = snake {
             *transmform.get_mut(snake.0).unwrap() = event.snake_details.transform;
             *moves.get_mut(snake.0).unwrap() = event.snake_details.moves.clone();
             *spawners.get_mut(snake.0).unwrap() = event.snake_details.spawners.clone();
@@ -477,8 +474,13 @@ pub fn update_snake(
                 let cell_entity = cells.iter().find(|p| p.1 == &cell.cell_tag);
                 let compensation_time =
                     if let Some((start_time_player, start_time_self)) = player.start_time {
-                        (event.update_time - start_time_player)
-                            - (time.elapsed_seconds() - start_time_self)
+                        let extra = (time.elapsed_seconds() - start_time_self)
+                            - (event.update_time - start_time_player);
+                        info!("Lagged {}", extra);
+                        if extra < 0. {
+                            player.start_time = Some((event.update_time, time.elapsed_seconds()));
+                        }
+                        extra
                     } else {
                         0.
                     }
@@ -518,17 +520,14 @@ pub fn update_snake(
             }
         } else {
             let snake = commands
-                .spawn((
-                    Snake {
-                        tag: SnakeTag::OtherPlayerSnake(event.user_id),
-                        spatial: SpatialBundle::from_transform(event.snake_details.transform),
+                .spawn((Snake {
+                    tag: SnakeTag::OtherPlayerSnake(event.user_id),
+                    spatial: SpatialBundle::from_transform(event.snake_details.transform),
 
-                        lastmove: LastMoveId(0),
-                        moves: event.snake_details.moves.clone(),
-                        spawners: event.snake_details.spawners.clone(),
-                    },
-                    LastUpdatedAt(event.snake_details.elaps),
-                ))
+                    lastmove: LastMoveId(0),
+                    moves: event.snake_details.moves.clone(),
+                    spawners: event.snake_details.spawners.clone(),
+                },))
                 .with_children(|parent| {
                     for cell in event.snake_details.cells.iter() {
                         parent.spawn(SnakeCell {
@@ -550,6 +549,7 @@ pub fn update_snake(
                     }
                 })
                 .id();
+            player.start_time = Some((event.update_time, time.elapsed_seconds()));
         }
     }
 }
