@@ -25,14 +25,17 @@ pub enum SendMessage {
     TransportMessage(TransportMessage),
 }
 
+type PointInTime = f32;
+
 #[derive(Serialize, Deserialize)]
 pub enum TransportMessage {
     Noop,
     InformPlayers(Vec<PlayerProp>),
-    SnakeUpdate(SnakeDetails),
+    SnakeUpdate(PointInTime, SnakeDetails),
     AddMove(Move),
     AddSpawn(SpawnDetail),
-    StartGame,
+    StartGame(PointInTime),
+    GameStarted(PointInTime),
     SpawnFood(u32, Vec2),
     DespawnFood(u32),
 }
@@ -51,7 +54,7 @@ pub struct SnakeCellDetails {
     cell_tag: CellTag,
     transform: Transform,
     move_id: MoveId,
-    direction: Direction,
+    direction: crate::Direction,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -91,6 +94,7 @@ pub struct ConnectionHandler {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerProp {
+    pub start_time: Option<(PointInTime, PointInTime)>,
     pub user_id: u32,
     pub color: Color,
 }
@@ -106,6 +110,7 @@ pub struct LastUpdatedAt(f64);
 
 #[derive(Event)]
 pub struct SnakeUpdate {
+    update_time: PointInTime,
     user_id: u32,
     snake_details: SnakeDetails,
 }
@@ -209,6 +214,7 @@ pub fn receive_msgs(
     mut host: Query<Entity, With<Host>>,
     food: Query<(Entity, &Food)>,
     mut commands: Commands,
+    time: Res<Time>,
 ) {
     match connection_handler.as_mut() {
         ConnectionState::NotConnected => {}
@@ -237,7 +243,11 @@ pub fn receive_msgs(
                                             lightness: 0.5,
                                             alpha: 1.,
                                         };
-                                        connection.players.push(PlayerProp { user_id, color });
+                                        connection.players.push(PlayerProp {
+                                            user_id,
+                                            color,
+                                            start_time: None,
+                                        });
                                     }
                                     players_changed_ev.send(PlayersChanged {
                                         players: connection.players.clone(),
@@ -253,7 +263,11 @@ pub fn receive_msgs(
                                             lightness: 0.5,
                                             alpha: 1.,
                                         };
-                                        connection.players.push(PlayerProp { user_id: id, color });
+                                        connection.players.push(PlayerProp {
+                                            user_id: id,
+                                            color,
+                                            start_time: None,
+                                        });
                                         players_changed_ev.send(PlayersChanged {
                                             players: connection.players.clone(),
                                             self_player: connection.self_id,
@@ -290,12 +304,14 @@ pub fn receive_msgs(
                                     if let Ok(transport_msg) = transport_msg {
                                         match transport_msg {
                                             TransportMessage::Noop => {}
-                                            TransportMessage::SnakeUpdate(snake_details) => {
-                                                snake_update.send(SnakeUpdate {
-                                                    user_id: user_id,
-                                                    snake_details,
-                                                })
-                                            }
+                                            TransportMessage::SnakeUpdate(
+                                                update_time,
+                                                snake_details,
+                                            ) => snake_update.send(SnakeUpdate {
+                                                update_time: update_time,
+                                                user_id: user_id,
+                                                snake_details,
+                                            }),
                                             TransportMessage::AddMove(_move) => {
                                                 add_move.send(AddMove { user_id, _move })
                                             }
@@ -309,7 +325,15 @@ pub fn receive_msgs(
                                                     commands.entity(host).despawn();
                                                 }
                                             }
-                                            TransportMessage::StartGame => {
+                                            TransportMessage::StartGame(start_time) => {
+                                                let host = connection
+                                                    .players
+                                                    .iter_mut()
+                                                    .find(|p| p.user_id == user_id);
+                                                if let Some(host) = host {
+                                                    host.start_time =
+                                                        Some((start_time, time.elapsed_seconds()));
+                                                }
                                                 next_state.set(GameStates::GamePlay);
                                             }
                                             TransportMessage::SpawnFood(food_id, food_pos) => {
@@ -324,6 +348,16 @@ pub fn receive_msgs(
                                                 let food = food.iter().find(|f| f.1 .0 == id);
                                                 if let Some(food) = food {
                                                     commands.entity(food.0).despawn_recursive();
+                                                }
+                                            }
+                                            TransportMessage::GameStarted(start_time) => {
+                                                let player = connection
+                                                    .players
+                                                    .iter_mut()
+                                                    .find(|p| p.user_id == user_id);
+                                                if let Some(player) = player {
+                                                    player.start_time =
+                                                        Some((start_time, time.elapsed_seconds()));
                                                 }
                                             }
                                         }
@@ -393,7 +427,7 @@ pub fn send_snake_send(
         ConnectionState::NotConnected => {}
         ConnectionState::Connected(connection) => {
             if let Err(err) = connection.sender.send(SendMessage::TransportMessage(
-                TransportMessage::SnakeUpdate(snake_details),
+                TransportMessage::SnakeUpdate(time.elapsed_seconds(), snake_details),
             )) {
                 warn!("{err:?}")
             }
@@ -413,6 +447,7 @@ pub fn update_snake(
     mut direction: Query<&mut Direction>,
     mut transmform: Query<&mut Transform, Or<(With<CellTag>, With<SnakeTag>)>>,
     connection_handler: Res<ConnectionState>,
+    time: Res<Time>,
 ) {
     let ConnectionState::Connected(connection) = connection_handler.as_ref() else {
         return;
@@ -440,8 +475,21 @@ pub fn update_snake(
             *spawners.get_mut(snake.0).unwrap() = event.snake_details.spawners.clone();
             for cell in event.snake_details.cells.iter() {
                 let cell_entity = cells.iter().find(|p| p.1 == &cell.cell_tag);
+                let compensation_time =
+                    if let Some((start_time_player, start_time_self)) = player.start_time {
+                        (event.update_time - start_time_player)
+                            - (time.elapsed_seconds() - start_time_self)
+                    } else {
+                        0.
+                    }
+                    .clamp(0., f32::INFINITY);
+                let direction_vec3: Vec3 = cell.direction.clone().into();
+                let compensation_transform: Vec3 =
+                    compensation_time * config.speed * direction_vec3;
                 if let Some(cell_entity) = cell_entity {
-                    *transmform.get_mut(cell_entity.0).unwrap() = cell.transform;
+                    *transmform.get_mut(cell_entity.0).unwrap() = cell
+                        .transform
+                        .with_translation(cell.transform.translation + compensation_transform);
                     *direction.get_mut(cell_entity.0).unwrap() = cell.direction.clone();
                     *move_id.get_mut(cell_entity.0).unwrap() = MoveId(cell.move_id.0);
                 } else {
@@ -457,7 +505,9 @@ pub fn update_snake(
                                     custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
                                     ..default()
                                 },
-                                transform: cell.transform.clone(),
+                                transform: cell.transform.clone().with_translation(
+                                    cell.transform.translation + compensation_transform,
+                                ),
                                 ..default()
                             },
                             move_id: MoveId(cell.move_id.0),

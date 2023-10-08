@@ -187,6 +187,7 @@ pub fn lobby_handle_button(
     mut next_state: ResMut<NextState<GameStates>>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<StartButton>)>,
     mut connection_handler: ResMut<ConnectionState>,
+    time: Res<Time>,
 ) {
     for interaction in &interaction_query {
         match *interaction {
@@ -195,7 +196,7 @@ pub fn lobby_handle_button(
                     connection
                         .sender
                         .send(crate::networking::SendMessage::TransportMessage(
-                            crate::networking::TransportMessage::StartGame,
+                            crate::networking::TransportMessage::StartGame(time.elapsed_seconds()),
                         ));
                     next_state.set(GameStates::GamePlay);
                 }

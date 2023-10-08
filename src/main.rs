@@ -60,6 +60,16 @@ pub struct Player;
 #[derive(Component, Clone, Serialize, Deserialize)]
 pub struct Direction(Vec2);
 
+impl Into<Vec3> for Direction {
+    fn into(self) -> Vec3 {
+        Vec3 {
+            x: self.0.x,
+            y: self.0.y,
+            z: 0.,
+        }
+    }
+}
+
 #[derive(Component, Serialize, Deserialize)]
 pub struct MoveId(u32);
 
