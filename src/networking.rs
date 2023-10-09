@@ -510,7 +510,7 @@ pub fn update_snake(
                     if let Some((start_time_player, start_time_self)) = player.start_time {
                         let extra = (time.elapsed_seconds() - start_time_self)
                             - (event.update_time - start_time_player);
-                        info!("Lagged {}", extra);
+                        // info!("Lagged {}", extra);
                         if extra < 0. {
                             player.start_time = Some((event.update_time, time.elapsed_seconds()));
                         }
