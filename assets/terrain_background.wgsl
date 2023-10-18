@@ -46,7 +46,7 @@ fn fragment(
     let dt4 = vec4(dt.x, dt.y, dt.z, 1.0-n);
 
     let blended = alphaBlend(dt4, ct4, n);
-    return ct;
+    return blended;
 }
 
 fn alphaBlend( srcColor:vec4<f32>,  dstColor:vec4<f32>, factor: f32) -> vec4<f32> {
