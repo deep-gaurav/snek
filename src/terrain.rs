@@ -6,7 +6,7 @@ use bevy::{
     sprite::{Material2d, MaterialMesh2dBundle, Mesh2dHandle},
 };
 
-use crate::{Head, GameConfig};
+use crate::{GameConfig, Head};
 
 #[derive(AsBindGroup, TypeUuid, Clone, TypePath)]
 #[uuid = "1e449d2e-6901-4bff-95fa-d7407ad62b58"]
@@ -74,31 +74,40 @@ pub fn terrain_tiler(
     config: Res<GameConfig>,
 ) {
     if let Some(head) = player_head.iter().next() {
-        info!("Head present");
         let block_x = (head.translation.x as i32 / 100);
         let block_y = (head.translation.y as i32 / 100);
-        let horizontal = (config.game_size.0 as i32)/200 +3;
-        let vertical = (config.game_size.1 as i32)/200 +3;
+        let horizontal = (config.game_size.0 as i32) / 200 + 3;
+        let vertical = (config.game_size.1 as i32) / 200 + 3;
 
-        for terr in terrains.iter(){
-            if !((block_x-horizontal)..(block_x+horizontal)).contains(&terr.1.x) || !((block_y-vertical)..(block_y+vertical)).contains(&terr.1.y) {
+        for terr in terrains.iter() {
+            if !((block_x - horizontal)..(block_x + horizontal)).contains(&terr.1.x)
+                || !((block_y - vertical)..(block_y + vertical)).contains(&terr.1.y)
+            {
                 commands.entity(terr.0).despawn_recursive();
             }
         }
         for x in -horizontal..horizontal {
             for y in -vertical..vertical {
-                let block_x = block_x+x;
-                let block_y = block_y+y;
-                if !terrains.iter().any(|f|f.1.x==block_x && f.1.y==block_y){
-                    commands.spawn(
-                        (
-                            Terrain { x: block_x, y: block_y },
-                            TransformBundle::from_transform(Transform::from_translation(Vec3 { x: (block_x*100) as f32, y:( block_y*100) as f32, z: 0.0 })),
-                            VisibilityBundle {
-                                ..Default::default()
-                            },
-                        )
-                    );
+                let block_x = block_x + x;
+                let block_y = block_y + y;
+                if !terrains
+                    .iter()
+                    .any(|f| f.1.x == block_x && f.1.y == block_y)
+                {
+                    commands.spawn((
+                        Terrain {
+                            x: block_x,
+                            y: block_y,
+                        },
+                        TransformBundle::from_transform(Transform::from_translation(Vec3 {
+                            x: (block_x * 100) as f32,
+                            y: (block_y * 100) as f32,
+                            z: 0.0,
+                        })),
+                        VisibilityBundle {
+                            ..Default::default()
+                        },
+                    ));
                 }
             }
         }
@@ -125,5 +134,20 @@ pub fn create_terrain(
                 ..Default::default()
             });
         });
+    }
+}
+
+pub fn sync_cam(
+    mut transforms: Query<&mut Transform>,
+    head: Query<Entity, With<Head>>,
+    camera: Query<Entity, With<Camera>>,
+) {
+    if let (Some(head), Some(camera)) = (head.iter().next(), camera.iter().next()) {
+        if let Ok(head_trans) = transforms.get(head) {
+            let head_transform = head_trans.translation.clone();
+            if let Ok(mut cam_trans) = transforms.get_mut(camera) {
+                cam_trans.translation = head_transform;
+            }
+        }
     }
 }

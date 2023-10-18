@@ -25,7 +25,7 @@ fn fragment(
     vertex_output: MeshVertexOutput,
 ) -> @location(0) vec4<f32> {
     // perf: better to do in vertex shader!
-    var p = vertex_output.world_position.xy * 0.005; // ignoring rotation
+    var p = vertex_output.world_position.xy * 0.002; // ignoring rotation
     let params = material.params;
     let freq_scale = params.x;
     let amp_scale = params.y;
@@ -39,14 +39,14 @@ fn fragment(
     let ct = textureSample(color_texture, base_color_sampler, p);
     let gt2 = textureSample(grass_texture2, grass2_color_sampler, p);
     let dt = textureSample(dirt_texture, dirt_color_sampler, p);
-    var g2 = fbm_simplex_2d_seeded(p*0.03, 10, 2.5, 1.0, seed+1.0);
-    var n = fbm_simplex_2d_seeded(p*0.01, 10, 1.8, 0.8, seed);
+    var g2 = fbm_simplex_2d_seeded(p, 1, 2.5, 1.0, seed+1.0);
+    var n = fbm_simplex_2d_seeded(p, 1, 1.8, 0.8, seed);
 
     let ct4 = alphaBlend(vec4(ct.x, ct.y, ct.z, n), vec4(gt2.x, gt2.y, gt2.z, n), g2);
     let dt4 = vec4(dt.x, dt.y, dt.z, 1.0-n);
 
     let blended = alphaBlend(dt4, ct4, n);
-    return blended;
+    return ct;
 }
 
 fn alphaBlend( srcColor:vec4<f32>,  dstColor:vec4<f32>, factor: f32) -> vec4<f32> {

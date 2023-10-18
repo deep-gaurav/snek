@@ -74,16 +74,6 @@ pub fn setup_snek(
                             z: 0.0,
                         }),
                     ));
-                head.spawn((
-                    Camera2dBundle {
-                        camera: Camera {
-                            order: 10,
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                    MainCamera,
-                ));
             })
             .id();
 

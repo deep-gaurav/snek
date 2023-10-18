@@ -24,7 +24,7 @@ use networking::{
 };
 use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
-use terrain::{create_terrain, setup_terrain, TerrainMaterial, terrain_tiler};
+use terrain::{create_terrain, setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
 use window::{get_height, get_width};
 
 #[derive(Debug, Resource)]
@@ -148,7 +148,7 @@ pub struct MainCamera;
 fn main() {
     let mut app = App::new();
     app.insert_resource(GameConfig {
-        speed: 60.0,
+        speed: 100.0,
         cell_size: (20.0, 20.0),
         game_size: (0, 0),
     })
@@ -187,8 +187,6 @@ fn main() {
         Material2dPlugin::<TerrainMaterial>::default(),
     ))
     .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-    // .add_plugins(LogDiagnosticsPlugin::default())
-    // .add_plugins(FrameTimeDiagnosticsPlugin::default())
     .add_systems(Startup, (setup, setup_borders).chain())
     .add_systems(OnEnter(GameStates::EntryMenu), setup_menu)
     .add_systems(OnEnter(GameStates::GamePlay), setup_snek)
@@ -203,17 +201,21 @@ fn main() {
     .add_systems(
         Update,
         (
-            update_cell_direction,
-            move_cells.before(spawn_new_cell),
-            keyboard_input,
-            handle_touch,
-            handle_input_event,
-            update_head_sensor,
-            spawn_new_cell,
-            spawn_food_system,
-            handle_food_collision,
+            (
+                update_cell_direction,
+                move_cells.before(spawn_new_cell),
+                keyboard_input,
+                handle_touch,
+                handle_input_event,
+                update_head_sensor,
+                spawn_new_cell,
+                spawn_food_system,
+                handle_food_collision,
+            )
+                .run_if(in_state(GameStates::GamePlay)),
+            sync_cam,
         )
-            .run_if(in_state(GameStates::GamePlay)),
+            .chain(),
     )
     .add_systems(
         Update,
@@ -225,7 +227,7 @@ fn main() {
         ),
     )
     .add_systems(Startup, setup_terrain)
-    .add_systems(Update, (create_terrain,terrain_tiler));
+    .add_systems(Update, (create_terrain, terrain_tiler));
 
     #[cfg(debug_assertions)]
     debug_plugins(&mut app);
@@ -233,8 +235,12 @@ fn main() {
 }
 #[cfg(debug_assertions)]
 fn debug_plugins(app: &mut App) {
+    use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
+
     app.add_plugins(RapierDebugRenderPlugin::default());
 
+    app.add_plugins(LogDiagnosticsPlugin::default());
+    app.add_plugins(FrameTimeDiagnosticsPlugin::default());
     // app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 }
 
