@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 
 use crate::{
     networking::ConnectionState, CellTag, ChangeDirection, GameConfig, Head, HeadSensor,
-    LastMoveId, MoveId, Moves, Player, Snake, SnakeCell, SnakeTag, Spawner, Tail,
+    LastMoveId, MainCamera, MoveId, Moves, Player, Snake, SnakeCell, SnakeTag, Spawner, Tail,
 };
 
 pub fn setup_snek(
@@ -52,7 +52,7 @@ pub fn setup_snek(
                         transform: Transform::from_translation(Vec3::new(
                             initial_position.0,
                             initial_position.1,
-                            0.,
+                            1.,
                         )),
                         ..default()
                     },
@@ -74,6 +74,16 @@ pub fn setup_snek(
                             z: 0.0,
                         }),
                     ));
+                head.spawn((
+                    Camera2dBundle {
+                        camera: Camera {
+                            order: 10,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    MainCamera,
+                ));
             })
             .id();
 
@@ -94,7 +104,7 @@ pub fn setup_snek(
                     transform: Transform::from_translation(Vec3::new(
                         initial_position.0 - cell_size.0,
                         initial_position.1,
-                        0.,
+                        1.,
                     )),
                     ..default()
                 },
@@ -118,7 +128,7 @@ pub fn setup_snek(
                         transform: Transform::from_translation(Vec3::new(
                             initial_position.0 - (cell_size.0 * 2.0),
                             initial_position.1,
-                            0.,
+                            1.,
                         )),
                         ..default()
                     },

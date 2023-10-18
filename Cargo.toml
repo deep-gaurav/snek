@@ -71,7 +71,7 @@ features = [
 
     # File formats:
     # "dds", # Alternative DirectX format for GPU textures, instead of KTX2
-    #   "jpeg", # JPEG lossy format for 2D photos
+      "jpeg", # JPEG lossy format for 2D photos
     #   "webp", # WebP image format
     #   "bmp",  # Uncompressed BMP image format
     #   "tga",  # Truevision Targa image format

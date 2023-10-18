@@ -3,9 +3,16 @@ pub mod lobby;
 pub mod menu;
 pub mod networking;
 pub mod snek;
+pub mod terrain;
 pub mod window;
 
-use bevy::{input::touch::TouchPhase, prelude::*, window::WindowResolution};
+use bevy::{
+    input::touch::TouchPhase,
+    prelude::*,
+    render::render_resource::{AddressMode, SamplerDescriptor},
+    sprite::Material2dPlugin,
+    window::WindowResolution,
+};
 use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food_system};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
@@ -17,6 +24,7 @@ use networking::{
 };
 use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
+use terrain::{create_terrain, setup_terrain, TerrainMaterial, terrain_tiler};
 use window::{get_height, get_width};
 
 #[derive(Debug, Resource)]
@@ -134,6 +142,9 @@ impl GameStates {
     }
 }
 
+#[derive(Component)]
+pub struct MainCamera;
+
 fn main() {
     let mut app = App::new();
     app.insert_resource(GameConfig {
@@ -155,14 +166,26 @@ fn main() {
     .add_event::<AddSpawn>()
     .add_event::<AddMove>()
     .add_event::<PlayersChanged>()
-    .add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            resolution: WindowResolution::new(get_width(), get_height()),
-            canvas: Some("#main_canvas".into()),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }))
+    .add_plugins((
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    resolution: WindowResolution::new(get_width(), get_height()),
+                    canvas: Some("#main_canvas".into()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+            .set(ImagePlugin {
+                default_sampler: SamplerDescriptor {
+                    address_mode_u: AddressMode::Repeat,
+                    address_mode_v: AddressMode::Repeat,
+                    address_mode_w: AddressMode::Repeat,
+                    ..Default::default()
+                },
+            }),
+        Material2dPlugin::<TerrainMaterial>::default(),
+    ))
     .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
     // .add_plugins(LogDiagnosticsPlugin::default())
     // .add_plugins(FrameTimeDiagnosticsPlugin::default())
@@ -200,7 +223,9 @@ fn main() {
             send_snake_send.run_if(in_state(GameStates::GamePlay)),
             (update_snake, sync_add_move, sync_add_spawner).run_if(in_state(GameStates::GamePlay)),
         ),
-    );
+    )
+    .add_systems(Startup, setup_terrain)
+    .add_systems(Update, (create_terrain,terrain_tiler));
 
     #[cfg(debug_assertions)]
     debug_plugins(&mut app);
@@ -220,7 +245,13 @@ fn setup(mut config: ResMut<GameConfig>, mut commands: Commands, window: Query<&
         window.resolution.width() as u32,
         window.resolution.height() as u32,
     );
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle {
+        camera: Camera {
+            order: 0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 }
 
 fn setup_borders(config: Res<GameConfig>, mut commands: Commands) {
