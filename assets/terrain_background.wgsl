@@ -20,6 +20,11 @@ var dirt_texture: texture_2d<f32>;
 var grass_texture2: texture_2d<f32>;
 @group(1) @binding(6) var grass2_color_sampler: sampler;
 
+
+@group(1) @binding(7)
+var water_texture: texture_2d<f32>;
+@group(1) @binding(8) var water_texture_sampler: sampler;
+
 @fragment
 fn fragment(
     vertex_output: MeshVertexOutput,
@@ -29,7 +34,6 @@ fn fragment(
     let params = material.params;
     let freq_scale = params.x;
     let amp_scale = params.y;
-    let radius = params.z;
     let seed = params.w;
     
     // smooth noise same as used on cpu...
@@ -41,11 +45,33 @@ fn fragment(
     let dt = textureSample(dirt_texture, dirt_color_sampler, p);
     var g2 = fbm_simplex_2d_seeded(p, 1, 2.5, 1.0, seed+1.0);
     var n = fbm_simplex_2d_seeded(p, 1, 1.8, 0.8, seed);
+    let water = vec4(0.0,0.0,0.0,1.0);
+
+    let distance = p.x*p.x + p.y*p.y;
+    let radius = 2.0;
+    let radius_st = 1.8;
+    let radius_st_sq = radius_st*radius_st;
+    let radiussq = radius*radius;
+
+    var water_seed = 1.0;
+    if (distance>radiussq){
+        water_seed = 0.0;
+    }else if (distance > radius_st_sq){
+        let nom = distance-radius_st_sq;
+        let demon = radiussq - radius_st_sq;
+        water_seed = 1.0 - (nom / demon);
+    }
 
     let ct4 = alphaBlend(vec4(ct.x, ct.y, ct.z, n), vec4(gt2.x, gt2.y, gt2.z, n), g2);
     let dt4 = vec4(dt.x, dt.y, dt.z, 1.0-n);
 
-    let blended = alphaBlend(dt4, ct4, n);
+
+    // if (water_seed < 0.5){
+    //     water_seed = 0.0;
+    // }
+    let blended_terrain = alphaBlend(dt4, ct4, n);
+    let blended = alphaBlend(blended_terrain, water, water_seed);
+
     return blended;
 }
 
@@ -53,7 +79,7 @@ fn alphaBlend( srcColor:vec4<f32>,  dstColor:vec4<f32>, factor: f32) -> vec4<f32
     var t = 0.0;
     if factor>0.0 && factor<1.0{
         t = factor;
-    }else if factor >1.0{
+    }else if factor >=1.0{
         t=1.0;
     }
     let blended = srcColor.rgb*t+dstColor.rgb*(1.0-t);

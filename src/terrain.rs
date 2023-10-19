@@ -25,6 +25,10 @@ pub struct TerrainMaterial {
     #[texture(5)]
     #[sampler(6)]
     grass_texture2: Handle<Image>,
+
+    #[texture(7)]
+    #[sampler(8)]
+    water_texture: Handle<Image>,
 }
 
 #[derive(Resource, Clone)]
@@ -50,27 +54,20 @@ pub fn setup_terrain(
         color_texture: server.load("grass_03.jpeg"),
         dirt_texture: server.load("dirt_02.jpeg"),
         grass_texture2: server.load("grass_01.jpeg"),
+        water_texture: server.load("tex_Water.jpg"),
     });
     let mesh = meshes.add(Mesh::from(shape::Quad::new(Vec2::new(100.0, 100.0))));
     commands.insert_resource(TerrainMeshProp {
         material,
         mesh: mesh.into(),
     });
-    commands.spawn((
-        Terrain { x: 0, y: 0 },
-        TransformBundle {
-            ..Default::default()
-        },
-        VisibilityBundle {
-            ..Default::default()
-        },
-    ));
 }
 
 pub fn terrain_tiler(
     mut commands: Commands,
     terrains: Query<(Entity, &Terrain)>,
     player_head: Query<&Transform, With<Head>>,
+    terrain_prop: Res<TerrainMeshProp>,
     config: Res<GameConfig>,
 ) {
     if let Some(head) = player_head.iter().next() {
@@ -107,7 +104,14 @@ pub fn terrain_tiler(
                         VisibilityBundle {
                             ..Default::default()
                         },
-                    ));
+                    )).with_children(|terr|{
+                            terr.spawn(MaterialMesh2dBundle {
+                                mesh: terrain_prop.mesh.clone(),
+                                material: terrain_prop.material.clone(),
+                                ..Default::default()
+                            });
+                        
+                    });
                 }
             }
         }
@@ -118,23 +122,6 @@ pub fn terrain_tiler(
 pub struct Terrain {
     x: i32,
     y: i32,
-}
-
-pub fn create_terrain(
-    mut commands: Commands,
-    terrain_prop: Res<TerrainMeshProp>,
-    terrains: Query<(Entity, &Transform), Added<Terrain>>,
-) {
-    for (terrain_entity, _terrain_transform) in terrains.iter() {
-        info!("Adding terrain");
-        commands.entity(terrain_entity).with_children(|terr| {
-            terr.spawn(MaterialMesh2dBundle {
-                mesh: terrain_prop.mesh.clone(),
-                material: terrain_prop.material.clone(),
-                ..Default::default()
-            });
-        });
-    }
 }
 
 pub fn sync_cam(

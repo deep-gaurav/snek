@@ -24,7 +24,7 @@ use networking::{
 };
 use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
-use terrain::{create_terrain, setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
+use terrain::{ setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
 use window::{get_height, get_width};
 
 #[derive(Debug, Resource)]
@@ -227,7 +227,7 @@ fn main() {
         ),
     )
     .add_systems(Startup, setup_terrain)
-    .add_systems(Update, (create_terrain, terrain_tiler));
+    .add_systems(Update, ( terrain_tiler));
 
     #[cfg(debug_assertions)]
     debug_plugins(&mut app);
