@@ -22,11 +22,7 @@ pub fn spawn_food_system(
     }
     let pad = 20;
     if food_query.is_empty() {
-        let pos_x = rand::random::<f32>() * ((config.game_size.0 - pad) as f32)
-            - ((config.game_size.0 / 2) as f32);
-        let pos_y = rand::random::<f32>() * ((config.game_size.1 - pad) as f32)
-            - ((config.game_size.1 / 2) as f32);
-
+        let (pos_x, pos_y) = ((rand::random::<f32>() - 0.5)*1600.0,(rand::random::<f32>() - 0.5)*1600.0);
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
             let food_id = rand::random();
             connection
