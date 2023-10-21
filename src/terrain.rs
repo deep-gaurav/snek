@@ -91,27 +91,28 @@ pub fn terrain_tiler(
                     .iter()
                     .any(|f| f.1.x == block_x && f.1.y == block_y)
                 {
-                    commands.spawn((
-                        Terrain {
-                            x: block_x,
-                            y: block_y,
-                        },
-                        TransformBundle::from_transform(Transform::from_translation(Vec3 {
-                            x: (block_x * 100) as f32,
-                            y: (block_y * 100) as f32,
-                            z: 0.0,
-                        })),
-                        VisibilityBundle {
-                            ..Default::default()
-                        },
-                    )).with_children(|terr|{
+                    commands
+                        .spawn((
+                            Terrain {
+                                x: block_x,
+                                y: block_y,
+                            },
+                            TransformBundle::from_transform(Transform::from_translation(Vec3 {
+                                x: (block_x * 100) as f32,
+                                y: (block_y * 100) as f32,
+                                z: 0.0,
+                            })),
+                            VisibilityBundle {
+                                ..Default::default()
+                            },
+                        ))
+                        .with_children(|terr| {
                             terr.spawn(MaterialMesh2dBundle {
                                 mesh: terrain_prop.mesh.clone(),
                                 material: terrain_prop.material.clone(),
                                 ..Default::default()
                             });
-                        
-                    });
+                        });
                 }
             }
         }

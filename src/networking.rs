@@ -18,7 +18,7 @@ use xwebtransport_core::{datagram::Receive, AcceptUniStream, Connecting, Endpoin
 use crate::{
     food::{spawn_food, Food},
     CellTag, Direction, GameConfig, GameStates, Host, LastMoveId, Move, MoveId, Moves, Snake,
-    SnakeCell, SnakeTag, SpawnDetail, Spawner,
+    SnakeCell, SnakeTag, SpawnDetail, Spawner, snek::KillSnake,
 };
 
 pub enum SendMessage {
@@ -36,6 +36,7 @@ pub enum TransportMessage {
     AddSpawn(SpawnDetail),
     StartGame(PointInTime),
     SpawnFood(u32, Vec2),
+    KillSnake,
     DespawnFood(u32),
     Ping(f32),
     Pong(f32),
@@ -219,6 +220,8 @@ pub fn receive_msgs(
     food: Query<(Entity, &Food)>,
     mut commands: Commands,
     time: Res<Time>,
+    mut snake_killer: EventWriter<KillSnake>,
+    snakes:Query<(Entity,&SnakeTag)>
 ) {
     match connection_handler.as_mut() {
         ConnectionState::NotConnected => {}
@@ -369,6 +372,11 @@ pub fn receive_msgs(
                                                     commands.entity(food.0).despawn_recursive();
                                                 }
                                             }
+                                            TransportMessage::KillSnake => {
+                                                if let Some(snek) = snakes.iter().find(|p|p.1==&SnakeTag::OtherPlayerSnake(user_id)){
+                                                    snake_killer.send(KillSnake { snake_id: snek.0 });
+                                                }
+                                            },
                                         }
                                     }
                                 }

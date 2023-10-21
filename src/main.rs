@@ -1,4 +1,5 @@
 pub mod food;
+pub mod game_over;
 pub mod lobby;
 pub mod menu;
 pub mod networking;
@@ -15,6 +16,7 @@ use bevy::{
 };
 use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food_system};
+use game_over::{check_snek_position, handle_kill_snake};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
@@ -23,8 +25,8 @@ use networking::{
     SnakeUpdate, TransportMessage,
 };
 use serde::{Deserialize, Serialize};
-use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor};
-use terrain::{ setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
+use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor, KillSnake};
+use terrain::{setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
 use window::{get_height, get_width};
 
 #[derive(Debug, Resource)]
@@ -166,6 +168,7 @@ fn main() {
     .add_event::<AddSpawn>()
     .add_event::<AddMove>()
     .add_event::<PlayersChanged>()
+    .add_event::<KillSnake>()
     .add_plugins((
         DefaultPlugins
             .set(WindowPlugin {
@@ -227,7 +230,10 @@ fn main() {
         ),
     )
     .add_systems(Startup, setup_terrain)
-    .add_systems(Update, ( terrain_tiler));
+    .add_systems(
+        Update,
+        (terrain_tiler, handle_kill_snake, check_snek_position),
+    );
 
     #[cfg(debug_assertions)]
     debug_plugins(&mut app);
@@ -239,8 +245,8 @@ fn debug_plugins(app: &mut App) {
 
     app.add_plugins(RapierDebugRenderPlugin::default());
 
-    app.add_plugins(LogDiagnosticsPlugin::default());
-    app.add_plugins(FrameTimeDiagnosticsPlugin::default());
+    // app.add_plugins(LogDiagnosticsPlugin::default());
+    // app.add_plugins(FrameTimeDiagnosticsPlugin::default());
     // app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 }
 
@@ -343,7 +349,9 @@ fn handle_input_event(
         InputsActions::Right => Vec2 { x: 1.0, y: 0.0 },
     };
 
-    let val = query.single_mut();
+    let Ok(val) = query.get_single_mut() else{
+        return;
+    };
     let player_id = val.0;
     let mut last_move = val.1;
     let mut moves = val.2;

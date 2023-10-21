@@ -3,7 +3,8 @@ use bevy_rapier2d::prelude::{Collider, CollisionEvent, Sensor};
 
 use crate::{
     networking::{ConnectionState, SendMessage, TransportMessage},
-    GameConfig, HeadSensor, Host, Spawner,
+    snek::KillSnake,
+    CellTag, GameConfig, HeadSensor, Host, SnakeTag, Spawner,
 };
 
 #[derive(Component)]
@@ -51,7 +52,7 @@ pub fn spawn_food(id: u32, cell_size: (f32, f32), pos_x: f32, pos_y: f32) -> imp
             transform: Transform::from_translation(Vec3 {
                 x: pos_x,
                 y: pos_y,
-                z: 0.,
+                z: 2.0,
             }),
             ..Default::default()
         },
@@ -65,14 +66,18 @@ pub fn handle_food_collision(
     head_sensor: Query<(Entity, &HeadSensor, &Parent)>,
     food: Query<(Entity, &Food)>,
     head_cell: Query<(&Parent, &Transform, &crate::Direction)>,
+    body_cell: Query<(Entity), With<CellTag>>,
     mut snek: Query<&mut Spawner>,
     mut commands: Commands,
     connection_handler: Res<ConnectionState>,
+    snek_main: Query<(Entity, &SnakeTag)>,
+    mut snake_kill_writer: EventWriter<KillSnake>,
 ) {
     for collision_event in collision_events.iter() {
         if let CollisionEvent::Started(object, collider, _flags) = collision_event {
             let food = food.get(*collider);
             let head = head_sensor.get(*object);
+            let cell = body_cell.get(*collider);
             if let (Ok(head), Ok(food)) = (head, food) {
                 commands.entity(food.0).despawn_recursive();
                 let headcell = head_cell.get(head.2.get());
@@ -94,6 +99,15 @@ pub fn handle_food_collision(
                                 warn!("{err:?}")
                             }
                         }
+                    }
+                }
+            } else if let (Ok(_head), Ok(_cell)) = (head, cell) {
+                if let Some(snek) = snek_main.iter().find(|s| s.1 == &SnakeTag::SelfPlayerSnake) {
+                    snake_kill_writer.send(KillSnake { snake_id: snek.0 });
+                    if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
+                        connection
+                            .sender
+                            .send(SendMessage::TransportMessage(TransportMessage::KillSnake));
                     }
                 }
             }

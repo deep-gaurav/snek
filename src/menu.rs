@@ -13,66 +13,97 @@ pub fn setup_menu(mut commands: Commands) {
             EntryMenuNode,
             NodeBundle {
                 style: Style {
-                    // center button
+                    flex_direction: FlexDirection::Column,
                     width: Val::Percent(100.),
                     height: Val::Percent(100.),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     column_gap: Val::Px(10.),
+                    row_gap: Val::Px(10.),
                     ..default()
                 },
                 ..default()
             },
         ))
         .with_children(|parent| {
+            parent.spawn(TextBundle::from_section(
+                "Snek",
+                TextStyle {
+                    font_size: 40.0,
+                    color: Color::rgb(0.9, 0.9, 0.9),
+                    ..default()
+                },
+            ));
+            parent.spawn(TextBundle::from_section(
+                "with Friends",
+                TextStyle {
+                    font_size: 35.0,
+                    color: Color::rgb(0.9, 0.9, 0.9),
+                    ..default()
+                },
+            ));
             parent
-                .spawn(ButtonBundle {
+                .spawn(NodeBundle {
                     style: Style {
-                        width: Val::Px(150.),
-                        height: Val::Px(65.),
-                        // horizontally center child text
+                        // center button
+                        flex_direction: FlexDirection::Row,
                         justify_content: JustifyContent::Center,
-                        // vertically center child text
                         align_items: AlignItems::Center,
+                        column_gap: Val::Px(10.),
                         ..default()
                     },
-                    background_color: Color::rgb(0.15, 0.15, 0.15).into(),
                     ..default()
                 })
                 .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "Host",
-                        TextStyle {
-                            font_size: 40.0,
-                            color: Color::rgb(0.9, 0.9, 0.9),
+                    parent
+                        .spawn(ButtonBundle {
+                            style: Style {
+                                width: Val::Px(150.),
+                                height: Val::Px(65.),
+                                // horizontally center child text
+                                justify_content: JustifyContent::Center,
+                                // vertically center child text
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            background_color: Color::rgb(0.15, 0.15, 0.15).into(),
                             ..default()
-                        },
-                    ));
-                });
+                        })
+                        .with_children(|parent| {
+                            parent.spawn(TextBundle::from_section(
+                                "Host",
+                                TextStyle {
+                                    font_size: 30.0,
+                                    color: Color::rgb(0.9, 0.9, 0.9),
+                                    ..default()
+                                },
+                            ));
+                        });
 
-            parent
-                .spawn(ButtonBundle {
-                    style: Style {
-                        width: Val::Px(150.),
-                        height: Val::Px(65.),
-                        // horizontally center child text
-                        justify_content: JustifyContent::Center,
-                        // vertically center child text
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    background_color: Color::rgb(0.15, 0.15, 0.15).into(),
-                    ..default()
-                })
-                .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "Join",
-                        TextStyle {
-                            font_size: 40.0,
-                            color: Color::rgb(0.9, 0.9, 0.9),
+                    parent
+                        .spawn(ButtonBundle {
+                            style: Style {
+                                width: Val::Px(150.),
+                                height: Val::Px(65.),
+                                // horizontally center child text
+                                justify_content: JustifyContent::Center,
+                                // vertically center child text
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            background_color: Color::rgb(0.15, 0.15, 0.15).into(),
                             ..default()
-                        },
-                    ));
+                        })
+                        .with_children(|parent| {
+                            parent.spawn(TextBundle::from_section(
+                                "Join",
+                                TextStyle {
+                                    font_size: 30.0,
+                                    color: Color::rgb(0.9, 0.9, 0.9),
+                                    ..default()
+                                },
+                            ));
+                        });
                 });
         })
         .id();

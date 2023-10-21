@@ -6,6 +6,11 @@ use crate::{
     LastMoveId, MainCamera, MoveId, Moves, Player, Snake, SnakeCell, SnakeTag, Spawner, Tail,
 };
 
+#[derive(Event)]
+pub struct KillSnake {
+    pub snake_id: Entity,
+}
+
 pub fn setup_snek(
     config: Res<GameConfig>,
     mut commands: Commands,
@@ -21,7 +26,8 @@ pub fn setup_snek(
 
         let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
         let cell_size = config.cell_size;
-        let initial_position = (0.0, 0.0);
+    
+        let initial_position = ((rand::random::<f32>() - 0.5)*1600.0,(rand::random::<f32>() - 0.5)*1600.0);
 
         let player_snake = commands
             .spawn((
@@ -59,6 +65,7 @@ pub fn setup_snek(
                     move_id: MoveId(0),
                 },
                 Head,
+                CollisionGroups::new(Group::NONE, Group::NONE),
             ))
             .with_children(|head| {
                 head.spawn(Collider::cuboid(1.0, collider_size.1))
@@ -78,28 +85,31 @@ pub fn setup_snek(
             .id();
 
         let cell2 = commands
-            .spawn((SnakeCell {
-                cell_tag: CellTag(rand::random()),
+            .spawn((
+                SnakeCell {
+                    cell_tag: CellTag(rand::random()),
 
-                collider: Collider::cuboid(collider_size.0, collider_size.1),
-                sensor: Sensor,
-                direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
+                    collider: Collider::cuboid(collider_size.0, collider_size.1),
+                    sensor: Sensor,
+                    direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
 
-                sprite: SpriteBundle {
-                    sprite: Sprite {
-                        color: player.color,
-                        custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                    sprite: SpriteBundle {
+                        sprite: Sprite {
+                            color: player.color,
+                            custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                            ..default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(
+                            initial_position.0 - cell_size.0,
+                            initial_position.1,
+                            1.,
+                        )),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(
-                        initial_position.0 - cell_size.0,
-                        initial_position.1,
-                        1.,
-                    )),
-                    ..default()
+                    move_id: MoveId(0),
                 },
-                move_id: MoveId(0),
-            },))
+                CollisionGroups::new(Group::NONE, Group::NONE),
+            ))
             .id();
         let cell3 = commands
             .spawn((
