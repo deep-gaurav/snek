@@ -3213,6 +3213,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "seeded-random"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "237b344c25622ede58b1196b3c9d5387cad2743b2b86c450f886100d8751f256"
+dependencies = [
+ "parking_lot",
+ "rand",
+ "rand_chacha",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.188"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3319,6 +3330,7 @@ dependencies = [
  "flume",
  "futures",
  "rand",
+ "seeded-random",
  "serde",
  "wasm-bindgen-futures",
  "web-sys",

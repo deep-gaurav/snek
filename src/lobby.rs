@@ -98,13 +98,9 @@ pub fn update_player_details(
 ) {
     if let Some(player_ev) = players_changed.iter().next() {
         let players_node: (Entity, &PlayersNode) = players_node.single();
-
+        commands.entity(players_node.0).despawn_descendants();
         for player in player_ev.players.iter() {
-            let player_node = player_nodes
-                .iter()
-                .find(|p| p.1 .0.user_id == player.user_id);
-            if let Some(node) = player_node {
-            } else {
+            
                 let node = commands
                     .spawn((
                         PlayerNode(player.clone()),
@@ -142,7 +138,7 @@ pub fn update_player_details(
                     })
                     .id();
                 commands.get_entity(players_node.0).unwrap().add_child(node);
-            }
+            
         }
         if host.is_empty() {
             for button in game_button.iter() {

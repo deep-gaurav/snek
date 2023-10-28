@@ -31,7 +31,7 @@ type PointInTime = f32;
 #[derive(Serialize, Deserialize)]
 pub enum TransportMessage {
     Noop,
-    InformPlayers(Vec<PlayerProp>),
+    // InformPlayers(Vec<PlayerProp>),
     SnakeUpdate(PointInTime, SnakeDetails),
     AddMove(PointInTime, Move),
     AddSpawn(SpawnDetail),
@@ -246,7 +246,7 @@ pub fn receive_msgs(
                                     connection.self_id = Some(user_id);
                                     if connection.players.is_empty() {
                                         let color = Color::Hsla {
-                                            hue: rand::random::<f32>() * 360.,
+                                            hue: seeded_random::Random::from_seed(seeded_random::Seed::unsafe_new(user_id as u64)).gen::<f32>() * 360.,
                                             saturation: 1.,
                                             lightness: 0.5,
                                             alpha: 1.,
@@ -258,22 +258,15 @@ pub fn receive_msgs(
                                             start_time: None,
                                         });
                                     }
-                                    players_changed_ev.send(PlayersChanged {
-                                        players: connection.players.clone(),
-                                        self_player: connection.self_id,
-                                    });
-                                }
-                                RelayMessage::UserConnected(id,users) => {
-                                    info!("User connected {id}");
-                                    if !host.is_empty() {
+                                    for user in users.iter() {
                                         let color = Color::Hsla {
-                                            hue: rand::random::<f32>() * 360.,
+                                            hue: seeded_random::Random::from_seed(seeded_random::Seed::unsafe_new(*user as u64)).gen::<f32>() * 360.,
                                             saturation: 1.,
                                             lightness: 0.5,
                                             alpha: 1.,
                                         };
                                         connection.players.push(PlayerProp {
-                                            user_id: id,
+                                            user_id: *user,
                                             color,
                                             start_time: None,
                                             last_update_time: None,
@@ -282,31 +275,55 @@ pub fn receive_msgs(
                                             players: connection.players.clone(),
                                             self_player: connection.self_id,
                                         });
-                                        connection.sender.send(SendMessage::TransportMessage(
-                                            TransportMessage::InformPlayers(
-                                                connection.players.clone(),
-                                            ),
-                                        ));
                                     }
+                                    players_changed_ev.send(PlayersChanged {
+                                        players: connection.players.clone(),
+                                        self_player: connection.self_id,
+                                    });
+                                    if !users.is_empty() {
+                                        for host in host.iter() {
+                                            commands.entity(host).despawn();
+                                        }
+                                    }
+
+                                }
+                                RelayMessage::UserConnected(id,users) => {
+                                    info!("User connected {id}");
+                                    let color = Color::Hsla {
+                                        hue: seeded_random::Random::from_seed(seeded_random::Seed::unsafe_new(id as u64)).gen::<f32>() * 360.,
+                                        saturation: 1.,
+                                        lightness: 0.5,
+                                        alpha: 1.,
+                                    };
+                                    connection.players.push(PlayerProp {
+                                        user_id: id,
+                                        color,
+                                        start_time: None,
+                                        last_update_time: None,
+                                    });
+                                    players_changed_ev.send(PlayersChanged {
+                                        players: connection.players.clone(),
+                                        self_player: connection.self_id,
+                                    });
                                 }
                                 RelayMessage::UserDisconnected(id,users) => {
                                     info!("User Disconnected {id}");
-                                    if !host.is_empty() {
-                                        let p_index =
-                                            connection.players.iter().position(|p| p.user_id == id);
-                                        if let Some(player_index) = p_index {
-                                            connection.players.remove(player_index);
-                                            players_changed_ev.send(PlayersChanged {
-                                                players: connection.players.clone(),
-                                                self_player: connection.self_id,
-                                            });
-                                            connection.sender.send(SendMessage::TransportMessage(
-                                                TransportMessage::InformPlayers(
-                                                    connection.players.clone(),
-                                                ),
-                                            ));
-                                        }
+                                    let p_index =
+                                        connection.players.iter().position(|p| p.user_id == id);
+
+                                    if connection.self_id == users.iter().next().cloned() && host.is_empty() {
+                                        info!("I'm host now!");
+                                        commands.spawn(Host);
                                     }
+                                    if let Some(player_index) = p_index {
+                                        connection.players.remove(player_index);
+                                        players_changed_ev.send(PlayersChanged {
+                                            players: connection.players.clone(),
+                                            self_player: connection.self_id,
+                                        });
+                                        info!("Removed player len {}", connection.players.len())
+                                    }
+                                    
                                 }
                                 RelayMessage::UserMessage(user_id, msg) => {
                                     let transport_msg =
@@ -350,12 +367,12 @@ pub fn receive_msgs(
                                             TransportMessage::AddSpawn(spawn) => {
                                                 add_spawn.send(AddSpawn { user_id, spawn })
                                             }
-                                            TransportMessage::InformPlayers(players) => {
-                                                connection.players = players;
-                                                for host in host.iter() {
-                                                    commands.entity(host).despawn();
-                                                }
-                                            }
+                                            // TransportMessage::InformPlayers(players) => {
+                                            //     connection.players = players;
+                                            //     for host in host.iter() {
+                                            //         commands.entity(host).despawn();
+                                            //     }
+                                            // }
                                             TransportMessage::StartGame(start_time) => {
                                                 next_state.set(GameStates::GamePlay);
                                             }
