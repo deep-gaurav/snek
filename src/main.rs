@@ -256,17 +256,18 @@ fn debug_plugins(app: &mut App) {
     // app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 }
 
-fn setup(mut config: ResMut<GameConfig>, mut commands: Commands, window: Query<&Window>,    asset_server: Res<AssetServer>,
+fn setup(
+    mut config: ResMut<GameConfig>,
+    mut commands: Commands,
+    window: Query<&Window>,
+    asset_server: Res<AssetServer>,
 ) {
     commands.spawn(Host);
     commands.spawn((
         SpriteBundle {
             texture: asset_server.load("red-arrow.png"),
-            sprite:Sprite {
-                custom_size: Some(Vec2{
-                    x:57.0,
-                    y:45.0
-                }),
+            sprite: Sprite {
+                custom_size: Some(Vec2 { x: 57.0, y: 45.0 }),
                 ..Default::default()
             },
             transform: Transform::from_translation(Vec3::new(0., 0., 2.)),

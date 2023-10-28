@@ -126,6 +126,7 @@ pub fn sync_food_pointer(
     global_transform: Query<&GlobalTransform>,
     camera: Query<(Entity, &Camera)>,
     q_window: Query<&Window, With<PrimaryWindow>>,
+    mut q_visibility: Query<&mut Visibility>,
 ) {
     let (Ok(food), Ok(pointer), Ok((camera_entity, camera)), Ok(window)) = (
         food.get_single(),
@@ -142,49 +143,63 @@ pub fn sync_food_pointer(
     let (Some(top_left), Some(top_right), Some(bottom_left), Some(bottom_right)) = (
         camera.viewport_to_world_2d(camera_transform, Vec2 { x: 0., y: 0. }),
         camera.viewport_to_world_2d(camera_transform, Vec2 { x: rect.0, y: 0. }),
-        camera.viewport_to_world_2d(camera_transform, Vec2 { x: 0., y:rect.1 }),
-        camera.viewport_to_world_2d(camera_transform, Vec2 { x: rect.0, y: rect.1 }),
+        camera.viewport_to_world_2d(camera_transform, Vec2 { x: 0., y: rect.1 }),
+        camera.viewport_to_world_2d(
+            camera_transform,
+            Vec2 {
+                x: rect.0,
+                y: rect.1,
+            },
+        ),
     ) else {
         return;
     };
-    let Ok(food_pos) = transform.get(food) else{
+    let Ok(food_pos) = transform.get(food) else {
         return;
     };
 
-
-    let ray = Ray{
+    let ray = Ray {
         origin: camera_transform.translation(),
-        direction: food_pos.translation -  camera_transform.translation(),
+        direction: food_pos.translation - camera_transform.translation(),
     };
     let normal = [
-        (top_left,bottom_left-top_left),
-        (bottom_left,top_left-bottom_left),
-        (bottom_left,bottom_left-bottom_right),
-        (bottom_right,bottom_right-bottom_left)
+        (top_left, bottom_left - top_left),
+        (bottom_left, top_left - bottom_left),
+        (bottom_left, bottom_left - bottom_right),
+        (bottom_right, bottom_right - bottom_left),
     ];
     let mut dist = None;
-    for (origin,normal) in normal.iter(){
-        if let Some(dis) = ray.intersect_plane(Vec3::new(origin.x,origin.y,0.), Vec3::new(normal.x,normal.y,0.)) {
+    for (origin, normal) in normal.iter() {
+        if let Some(dis) = ray.intersect_plane(
+            Vec3::new(origin.x, origin.y, 0.),
+            Vec3::new(normal.x, normal.y, 0.),
+        ) {
             if let Some(dist_val) = dist {
                 dist = Some(dis.min(dist_val));
-            }else{
+            } else {
                 dist = Some(dis);
             }
         }
     }
     if let Some(dist) = dist {
-
         let pt = ray.get_point(dist);
-        let angle = Vec2 { x: -1.0, y: 0.0 }.angle_between( ray.direction.truncate().normalize());
+        let angle = Vec2 { x: -1.0, y: 0.0 }.angle_between(ray.direction.truncate().normalize());
+        let visible = camera_transform.translation().truncate().distance_squared(food_pos.translation.truncate())> pt.truncate().distance_squared(camera_transform.translation().truncate());
+
         let Ok(mut pointer_transform) = transform.get_mut(pointer) else {
             return;
         };
-        let pt = Vec3::new(pt.x,pt.y, 2.0);
+        let pt = Vec3::new(pt.x, pt.y, 2.0);
         let offset = -20.0 * ray.direction.truncate().normalize();
         let offset = Vec3::new(offset.x, offset.y, 2.0);
         pointer_transform.translation = pt + offset;
         pointer_transform.rotation = Quat::from_rotation_z(angle);
+        *q_visibility.get_mut(pointer).unwrap() = if visible {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+
         // pointer_transform.look_to(food_pos, Vec3::Y);
     }
-    
 }
