@@ -100,45 +100,43 @@ pub fn update_player_details(
         let players_node: (Entity, &PlayersNode) = players_node.single();
         commands.entity(players_node.0).despawn_descendants();
         for player in player_ev.players.iter() {
-            
-                let node = commands
-                    .spawn((
-                        PlayerNode(player.clone()),
-                        NodeBundle {
+            let node = commands
+                .spawn((
+                    PlayerNode(player.clone()),
+                    NodeBundle {
+                        ..Default::default()
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn(NodeBundle {
+                        background_color: player.color.into(),
+                        style: Style {
+                            width: Val::Px(30.),
+                            height: Val::Px(30.),
+                            margin: UiRect::right(Val::Px(10.)),
                             ..Default::default()
                         },
-                    ))
-                    .with_children(|parent| {
-                        parent.spawn(NodeBundle {
-                            background_color: player.color.into(),
-                            style: Style {
-                                width: Val::Px(30.),
-                                height: Val::Px(30.),
-                                margin: UiRect::right(Val::Px(10.)),
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        });
-                        parent.spawn(TextBundle::from_section(
-                            format!(
-                                "Player {}{}",
-                                player.user_id,
-                                if Some(player.user_id) == player_ev.self_player {
-                                    " (You)"
-                                } else {
-                                    ""
-                                }
-                            ),
-                            TextStyle {
-                                font_size: 30.0,
-                                color: Color::rgb(0.9, 0.9, 0.9),
-                                ..default()
-                            },
-                        ));
-                    })
-                    .id();
-                commands.get_entity(players_node.0).unwrap().add_child(node);
-            
+                        ..Default::default()
+                    });
+                    parent.spawn(TextBundle::from_section(
+                        format!(
+                            "Player {}{}",
+                            player.user_id,
+                            if Some(player.user_id) == player_ev.self_player {
+                                " (You)"
+                            } else {
+                                ""
+                            }
+                        ),
+                        TextStyle {
+                            font_size: 30.0,
+                            color: Color::rgb(0.9, 0.9, 0.9),
+                            ..default()
+                        },
+                    ));
+                })
+                .id();
+            commands.get_entity(players_node.0).unwrap().add_child(node);
         }
         if host.is_empty() {
             for button in game_button.iter() {

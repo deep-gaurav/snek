@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_rapier2d::prelude::{Collider, CollisionEvent, Sensor};
 
 use crate::{
@@ -22,7 +22,10 @@ pub fn spawn_food_system(
     }
     let pad = 20;
     if food_query.is_empty() {
-        let (pos_x, pos_y) = ((rand::random::<f32>() - 0.5)*1600.0,(rand::random::<f32>() - 0.5)*1600.0);
+        let (pos_x, pos_y) = (
+            (rand::random::<f32>() - 0.5) * 1600.0,
+            (rand::random::<f32>() - 0.5) * 1600.0,
+        );
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
             let food_id = rand::random();
             connection
@@ -112,3 +115,77 @@ pub fn handle_food_collision(
 }
 
 // pub fn
+
+#[derive(Component)]
+pub struct FoodPointer;
+
+pub fn sync_food_pointer(
+    food: Query<Entity, With<Food>>,
+    pointer: Query<Entity, With<FoodPointer>>,
+    mut transform: Query<&mut Transform>,
+    global_transform: Query<&GlobalTransform>,
+    camera: Query<(Entity, &Camera)>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
+) {
+    let (Ok(food), Ok(pointer), Ok((camera_entity, camera)), Ok(window)) = (
+        food.get_single(),
+        pointer.get_single(),
+        camera.get_single(),
+        q_window.get_single(),
+    ) else {
+        return;
+    };
+    let Ok(camera_transform) = global_transform.get(camera_entity) else {
+        return;
+    };
+    let rect = (window.width(), window.height());
+    let (Some(top_left), Some(top_right), Some(bottom_left), Some(bottom_right)) = (
+        camera.viewport_to_world_2d(camera_transform, Vec2 { x: 0., y: 0. }),
+        camera.viewport_to_world_2d(camera_transform, Vec2 { x: rect.0, y: 0. }),
+        camera.viewport_to_world_2d(camera_transform, Vec2 { x: 0., y:rect.1 }),
+        camera.viewport_to_world_2d(camera_transform, Vec2 { x: rect.0, y: rect.1 }),
+    ) else {
+        return;
+    };
+    let Ok(food_pos) = transform.get(food) else{
+        return;
+    };
+
+
+    let ray = Ray{
+        origin: camera_transform.translation(),
+        direction: food_pos.translation -  camera_transform.translation(),
+    };
+    let normal = [
+        (top_left,bottom_left-top_left),
+        (bottom_left,top_left-bottom_left),
+        (bottom_left,bottom_left-bottom_right),
+        (bottom_right,bottom_right-bottom_left)
+    ];
+    let mut dist = None;
+    for (origin,normal) in normal.iter(){
+        if let Some(dis) = ray.intersect_plane(Vec3::new(origin.x,origin.y,0.), Vec3::new(normal.x,normal.y,0.)) {
+            if let Some(dist_val) = dist {
+                dist = Some(dis.min(dist_val));
+            }else{
+                dist = Some(dis);
+            }
+        }
+    }
+    if let Some(dist) = dist {
+
+        let pt = ray.get_point(dist);
+        let angle = Vec2 { x: -1.0, y: 0.0 }.angle_between( ray.direction.truncate().normalize());
+        info!("Angle : {}", angle);
+        let Ok(mut pointer_transform) = transform.get_mut(pointer) else {
+            return;
+        };
+        let pt = Vec3::new(pt.x,pt.y, 2.0);
+        let offset = -20.0 * ray.direction.truncate().normalize();
+        let offset = Vec3::new(offset.x, offset.y, 2.0);
+        pointer_transform.translation = pt + offset;
+        pointer_transform.rotation = Quat::from_rotation_z(angle);
+        // pointer_transform.look_to(food_pos, Vec3::Y);
+    }
+    
+}

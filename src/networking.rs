@@ -246,7 +246,11 @@ pub fn receive_msgs(
                                     connection.self_id = Some(user_id);
                                     if connection.players.is_empty() {
                                         let color = Color::Hsla {
-                                            hue: seeded_random::Random::from_seed(seeded_random::Seed::unsafe_new(user_id as u64)).gen::<f32>() * 360.,
+                                            hue: seeded_random::Random::from_seed(
+                                                seeded_random::Seed::unsafe_new(user_id as u64),
+                                            )
+                                            .gen::<f32>()
+                                                * 360.,
                                             saturation: 1.,
                                             lightness: 0.5,
                                             alpha: 1.,
@@ -260,7 +264,11 @@ pub fn receive_msgs(
                                     }
                                     for user in users.iter() {
                                         let color = Color::Hsla {
-                                            hue: seeded_random::Random::from_seed(seeded_random::Seed::unsafe_new(*user as u64)).gen::<f32>() * 360.,
+                                            hue: seeded_random::Random::from_seed(
+                                                seeded_random::Seed::unsafe_new(*user as u64),
+                                            )
+                                            .gen::<f32>()
+                                                * 360.,
                                             saturation: 1.,
                                             lightness: 0.5,
                                             alpha: 1.,
@@ -285,12 +293,15 @@ pub fn receive_msgs(
                                             commands.entity(host).despawn();
                                         }
                                     }
-
                                 }
-                                RelayMessage::UserConnected(id,users) => {
+                                RelayMessage::UserConnected(id, users) => {
                                     info!("User connected {id}");
                                     let color = Color::Hsla {
-                                        hue: seeded_random::Random::from_seed(seeded_random::Seed::unsafe_new(id as u64)).gen::<f32>() * 360.,
+                                        hue: seeded_random::Random::from_seed(
+                                            seeded_random::Seed::unsafe_new(id as u64),
+                                        )
+                                        .gen::<f32>()
+                                            * 360.,
                                         saturation: 1.,
                                         lightness: 0.5,
                                         alpha: 1.,
@@ -306,12 +317,14 @@ pub fn receive_msgs(
                                         self_player: connection.self_id,
                                     });
                                 }
-                                RelayMessage::UserDisconnected(id,users) => {
+                                RelayMessage::UserDisconnected(id, users) => {
                                     info!("User Disconnected {id}");
                                     let p_index =
                                         connection.players.iter().position(|p| p.user_id == id);
 
-                                    if connection.self_id == users.iter().next().cloned() && host.is_empty() {
+                                    if connection.self_id == users.iter().next().cloned()
+                                        && host.is_empty()
+                                    {
                                         info!("I'm host now!");
                                         commands.spawn(Host);
                                     }
@@ -323,7 +336,6 @@ pub fn receive_msgs(
                                         });
                                         info!("Removed player len {}", connection.players.len())
                                     }
-                                    
                                 }
                                 RelayMessage::UserMessage(user_id, msg) => {
                                     let transport_msg =

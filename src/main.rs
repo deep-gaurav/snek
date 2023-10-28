@@ -15,7 +15,7 @@ use bevy::{
     window::WindowResolution,
 };
 use bevy_rapier2d::{na::ComplexField, prelude::*};
-use food::{handle_food_collision, spawn_food_system};
+use food::{handle_food_collision, spawn_food_system, sync_food_pointer, FoodPointer};
 use game_over::{check_snek_position, handle_kill_snake};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
@@ -226,7 +226,13 @@ fn main() {
             receive_msgs,
             ping_send,
             send_snake_send.run_if(in_state(GameStates::GamePlay)),
-            (update_snake, sync_add_move, sync_add_spawner).run_if(in_state(GameStates::GamePlay)),
+            (
+                update_snake,
+                sync_add_move,
+                sync_add_spawner,
+                sync_food_pointer,
+            )
+                .run_if(in_state(GameStates::GamePlay)),
         ),
     )
     .add_systems(Startup, setup_terrain)
@@ -250,8 +256,24 @@ fn debug_plugins(app: &mut App) {
     // app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 }
 
-fn setup(mut config: ResMut<GameConfig>, mut commands: Commands, window: Query<&Window>) {
+fn setup(mut config: ResMut<GameConfig>, mut commands: Commands, window: Query<&Window>,    asset_server: Res<AssetServer>,
+) {
     commands.spawn(Host);
+    commands.spawn((
+        SpriteBundle {
+            texture: asset_server.load("red-arrow.png"),
+            sprite:Sprite {
+                custom_size: Some(Vec2{
+                    x:57.0,
+                    y:45.0
+                }),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+            ..default()
+        },
+        FoodPointer,
+    ));
     let window = window.single();
     config.game_size = (
         window.resolution.width() as u32,
@@ -349,7 +371,7 @@ fn handle_input_event(
         InputsActions::Right => Vec2 { x: 1.0, y: 0.0 },
     };
 
-    let Ok(val) = query.get_single_mut() else{
+    let Ok(val) = query.get_single_mut() else {
         return;
     };
     let player_id = val.0;
