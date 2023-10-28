@@ -17,8 +17,9 @@ use xwebtransport_core::{datagram::Receive, AcceptUniStream, Connecting, Endpoin
 
 use crate::{
     food::{spawn_food, Food},
+    snek::KillSnake,
     CellTag, Direction, GameConfig, GameStates, Host, LastMoveId, Move, MoveId, Moves, Snake,
-    SnakeCell, SnakeTag, SpawnDetail, Spawner, snek::KillSnake,
+    SnakeCell, SnakeTag, SpawnDetail, Spawner,
 };
 
 pub enum SendMessage {
@@ -60,9 +61,9 @@ pub struct SnakeCellDetails {
 
 #[derive(Debug, serde::Deserialize)]
 pub enum RelayMessage {
-    RoomJoined(u32),
-    UserConnected(u32),
-    UserDisconnected(u32),
+    RoomJoined(u32, Vec<u32>),
+    UserConnected(u32, Vec<u32>),
+    UserDisconnected(u32, Vec<u32>),
     UserMessage(u32, Vec<u8>),
 }
 
@@ -221,7 +222,7 @@ pub fn receive_msgs(
     mut commands: Commands,
     time: Res<Time>,
     mut snake_killer: EventWriter<KillSnake>,
-    snakes:Query<(Entity,&SnakeTag)>
+    snakes: Query<(Entity, &SnakeTag)>,
 ) {
     match connection_handler.as_mut() {
         ConnectionState::NotConnected => {}
@@ -237,7 +238,7 @@ pub fn receive_msgs(
                         let msg = bincode::deserialize::<RelayMessage>(&data);
                         if let Ok(msg) = msg {
                             match msg {
-                                RelayMessage::RoomJoined(user_id) => {
+                                RelayMessage::RoomJoined(user_id, users) => {
                                     connection.sender.send(SendMessage::TransportMessage(
                                         TransportMessage::Noop,
                                     ));
@@ -262,7 +263,7 @@ pub fn receive_msgs(
                                         self_player: connection.self_id,
                                     });
                                 }
-                                RelayMessage::UserConnected(id) => {
+                                RelayMessage::UserConnected(id,users) => {
                                     info!("User connected {id}");
                                     if !host.is_empty() {
                                         let color = Color::Hsla {
@@ -288,7 +289,7 @@ pub fn receive_msgs(
                                         ));
                                     }
                                 }
-                                RelayMessage::UserDisconnected(id) => {
+                                RelayMessage::UserDisconnected(id,users) => {
                                     info!("User Disconnected {id}");
                                     if !host.is_empty() {
                                         let p_index =
@@ -373,10 +374,13 @@ pub fn receive_msgs(
                                                 }
                                             }
                                             TransportMessage::KillSnake => {
-                                                if let Some(snek) = snakes.iter().find(|p|p.1==&SnakeTag::OtherPlayerSnake(user_id)){
-                                                    snake_killer.send(KillSnake { snake_id: snek.0 });
+                                                if let Some(snek) = snakes.iter().find(|p| {
+                                                    p.1 == &SnakeTag::OtherPlayerSnake(user_id)
+                                                }) {
+                                                    snake_killer
+                                                        .send(KillSnake { snake_id: snek.0 });
                                                 }
-                                            },
+                                            }
                                         }
                                     }
                                 }
