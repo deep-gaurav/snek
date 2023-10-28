@@ -176,7 +176,6 @@ pub fn sync_food_pointer(
 
         let pt = ray.get_point(dist);
         let angle = Vec2 { x: -1.0, y: 0.0 }.angle_between( ray.direction.truncate().normalize());
-        info!("Angle : {}", angle);
         let Ok(mut pointer_transform) = transform.get_mut(pointer) else {
             return;
         };
