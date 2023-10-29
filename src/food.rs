@@ -7,7 +7,7 @@ use crate::{
     CellTag, GameConfig, HeadSensor, Host, SnakeTag, Spawner,
 };
 
-#[derive(Component)]
+#[derive(Component,Debug)]
 pub struct Food(pub u32);
 
 pub fn spawn_food_system(
@@ -79,6 +79,7 @@ pub fn handle_food_collision(
             let food = food.get(*collider);
             let head = head_sensor.get(*object);
             let cell = body_cell.get(*collider);
+            // info!("Collision food: {:?} head: {:?} cell {:?} object:{object:?}, collider: {collider:?} flags:{_flags:?}", food, head, cell);
             if let (Ok(head), Ok(food)) = (head, food) {
                 commands.entity(food.0).despawn_recursive();
                 let headcell = head_cell.get(head.2.get());

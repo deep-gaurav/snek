@@ -16,7 +16,7 @@ use bevy::{
 };
 use bevy_rapier2d::{na::ComplexField, prelude::*};
 use food::{handle_food_collision, spawn_food_system, sync_food_pointer, FoodPointer};
-use game_over::{check_snek_position, handle_kill_snake};
+use game_over::{check_snek_position, handle_kill_snake, respawn_menu_system, respawn_handle_button};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
@@ -25,7 +25,7 @@ use networking::{
     SnakeUpdate, TransportMessage,
 };
 use serde::{Deserialize, Serialize};
-use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor, KillSnake};
+use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor, KillSnake, SpawnSnake, spawn_snek};
 use terrain::{setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
 use window::{get_height, get_width};
 
@@ -105,7 +105,7 @@ pub struct Head;
 #[derive(Component)]
 pub struct Tail;
 
-#[derive(Component)]
+#[derive(Component,Debug)]
 pub struct HeadSensor;
 
 #[derive(Event)]
@@ -169,6 +169,7 @@ fn main() {
     .add_event::<AddMove>()
     .add_event::<PlayersChanged>()
     .add_event::<KillSnake>()
+    .add_event::<SpawnSnake>()
     .add_plugins((
         DefaultPlugins
             .set(WindowPlugin {
@@ -190,7 +191,7 @@ fn main() {
         Material2dPlugin::<TerrainMaterial>::default(),
     ))
     .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-    .add_systems(Startup, (setup, setup_borders).chain())
+    .add_systems(Startup, setup)
     .add_systems(OnEnter(GameStates::EntryMenu), setup_menu)
     .add_systems(OnEnter(GameStates::GamePlay), setup_snek)
     .add_systems(OnExit(GameStates::EntryMenu), clean_entry_menu)
@@ -214,6 +215,7 @@ fn main() {
                 spawn_new_cell,
                 spawn_food_system,
                 handle_food_collision,
+                spawn_snek,
             )
                 .run_if(in_state(GameStates::GamePlay)),
             sync_cam,
@@ -231,6 +233,8 @@ fn main() {
                 sync_add_move,
                 sync_add_spawner,
                 sync_food_pointer,
+                respawn_menu_system,
+                respawn_handle_button,
             )
                 .run_if(in_state(GameStates::GamePlay)),
         ),
@@ -287,56 +291,6 @@ fn setup(
         },
         ..Default::default()
     });
-}
-
-fn setup_borders(config: Res<GameConfig>, mut commands: Commands) {
-    println!("Window size {},{}", config.game_size.0, config.game_size.1);
-    let size = config.game_size;
-    let _top_border = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(0.25, 0.25, 0.25),
-                custom_size: Some(Vec2::new(size.0 as f32, 10.)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(0., (size.1 as f32) / 2., 0.)),
-            ..default()
-        })
-        .insert(Collider::cuboid((size.0 / 2) as f32, 5.));
-    let _bottom_border = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(0.25, 0.25, 0.25),
-                custom_size: Some(Vec2::new(size.0 as f32, 10.)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(0., -(size.1 as f32) / 2., 0.)),
-            ..default()
-        })
-        .insert(Collider::cuboid((size.0 / 2) as f32, 5.));
-
-    let _left_border = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(0.25, 0.25, 0.25),
-                custom_size: Some(Vec2::new(10., size.1 as f32)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(-(size.0 as f32) / 2., 0., 0.)),
-            ..default()
-        })
-        .insert(Collider::cuboid(5., (size.1 / 2) as f32));
-    let _right_border = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(0.25, 0.25, 0.25),
-                custom_size: Some(Vec2::new(10., size.1 as f32)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new((size.0 as f32) / 2., 0., 0.)),
-            ..default()
-        })
-        .insert(Collider::cuboid(5., (size.1 / 2) as f32));
 }
 
 fn move_cells(

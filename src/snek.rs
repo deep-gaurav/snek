@@ -11,141 +11,155 @@ pub struct KillSnake {
     pub snake_id: Entity,
 }
 
+#[derive(Event)]
+pub struct SpawnSnake;
+
 pub fn setup_snek(
+    mut spawn_snek_writer: EventWriter<SpawnSnake>
+) {
+    spawn_snek_writer.send(SpawnSnake);
+}
+
+pub fn spawn_snek(
     config: Res<GameConfig>,
     mut commands: Commands,
     connection_handler: Res<ConnectionState>,
-) {
-    if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-        let Some(player_id) = connection.self_id else {
-            return;
-        };
-        let Some(player) = connection.players.iter().find(|p| p.user_id == player_id) else {
-            return;
-        };
+    mut spawn_snek_reader: EventReader<SpawnSnake>
+){
+    for _event in spawn_snek_reader.iter(){
+        if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
 
-        let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
-        let cell_size = config.cell_size;
-
-        let initial_position =  {
-            let rad = rand::random::<f32>() * 900.0;
-            let angle = rand::random::<f32>() * std::f32::consts::PI * 2.0;
-            let (sin,cos) = angle.sin_cos();
-            (rad*sin, rad*cos)
-        };
-
-        let player_snake = commands
-            .spawn((
-                Snake {
-                    tag: SnakeTag::SelfPlayerSnake,
-                    spatial: Default::default(),
-
-                    lastmove: LastMoveId(0),
-                    moves: Moves { moves: vec![] },
-                    spawners: Spawner { spawners: vec![] },
-                },
-                Player,
-            ))
-            .id();
-        let cell1 = commands
-            .spawn((
-                SnakeCell {
-                    cell_tag: CellTag(rand::random()),
-                    collider: Collider::cuboid(collider_size.0, collider_size.1),
-                    sensor: Sensor,
-                    direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
-                    sprite: SpriteBundle {
-                        sprite: Sprite {
-                            color: player.color,
-                            custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+            let Some(player_id) = connection.self_id else {
+                return;
+            };
+            let Some(player) = connection.players.iter().find(|p| p.user_id == player_id) else {
+                return;
+            };
+        
+            let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
+            let cell_size = config.cell_size;
+        
+            let initial_position =  {
+                let rad = rand::random::<f32>() * 900.0;
+                let angle = rand::random::<f32>() * std::f32::consts::PI * 2.0;
+                let (sin,cos) = angle.sin_cos();
+                (rad*sin, rad*cos)
+            };
+        
+            let player_snake = commands
+                .spawn((
+                    Snake {
+                        tag: SnakeTag::SelfPlayerSnake,
+                        spatial: Default::default(),
+        
+                        lastmove: LastMoveId(0),
+                        moves: Moves { moves: vec![] },
+                        spawners: Spawner { spawners: vec![] },
+                    },
+                    Player,
+                ))
+                .id();
+            let cell1 = commands
+                .spawn((
+                    SnakeCell {
+                        cell_tag: CellTag(rand::random()),
+                        collider: Collider::cuboid(collider_size.0, collider_size.1),
+                        sensor: Sensor,
+                        direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
+                        sprite: SpriteBundle {
+                            sprite: Sprite {
+                                color: player.color,
+                                custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                                ..default()
+                            },
+                            transform: Transform::from_translation(Vec3::new(
+                                initial_position.0,
+                                initial_position.1,
+                                1.,
+                            )),
                             ..default()
                         },
-                        transform: Transform::from_translation(Vec3::new(
-                            initial_position.0,
-                            initial_position.1,
-                            1.,
-                        )),
-                        ..default()
+                        move_id: MoveId(0),
                     },
-                    move_id: MoveId(0),
-                },
-                Head,
-                CollisionGroups::new(Group::NONE, Group::NONE),
-            ))
-            .with_children(|head| {
-                head.spawn(Collider::cuboid(1.0, collider_size.1))
-                    .insert(RigidBody::KinematicPositionBased)
-                    .insert(Ccd::enabled())
-                    .insert(HeadSensor)
-                    .insert(ActiveCollisionTypes::all())
-                    .insert(ActiveEvents::COLLISION_EVENTS)
-                    .insert(TransformBundle::from_transform(
-                        Transform::from_translation(Vec3 {
-                            x: cell_size.0 / 2.0,
-                            y: 0.0,
-                            z: 0.0,
-                        }),
-                    ));
-            })
-            .id();
-
-        let cell2 = commands
-            .spawn((
-                SnakeCell {
-                    cell_tag: CellTag(rand::random()),
-
-                    collider: Collider::cuboid(collider_size.0, collider_size.1),
-                    sensor: Sensor,
-                    direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
-
-                    sprite: SpriteBundle {
-                        sprite: Sprite {
-                            color: player.color,
-                            custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                    Head,
+                    CollisionGroups::new(Group::NONE, Group::NONE),
+                ))
+                .with_children(|head| {
+                    head.spawn(Collider::cuboid(1.0, collider_size.1))
+                        .insert(RigidBody::KinematicPositionBased)
+                        .insert(Ccd::enabled())
+                        .insert(HeadSensor)
+                        .insert(ActiveCollisionTypes::all())
+                        .insert(ActiveEvents::COLLISION_EVENTS)
+                        .insert(TransformBundle::from_transform(
+                            Transform::from_translation(Vec3 {
+                                x: cell_size.0 / 2.0,
+                                y: 0.0,
+                                z: 0.0,
+                            }),
+                        ));
+                })
+                .id();
+        
+            let cell2 = commands
+                .spawn((
+                    SnakeCell {
+                        cell_tag: CellTag(rand::random()),
+        
+                        collider: Collider::cuboid(collider_size.0, collider_size.1),
+                        sensor: Sensor,
+                        direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
+        
+                        sprite: SpriteBundle {
+                            sprite: Sprite {
+                                color: player.color,
+                                custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                                ..default()
+                            },
+                            transform: Transform::from_translation(Vec3::new(
+                                initial_position.0 - cell_size.0,
+                                initial_position.1,
+                                1.,
+                            )),
                             ..default()
                         },
-                        transform: Transform::from_translation(Vec3::new(
-                            initial_position.0 - cell_size.0,
-                            initial_position.1,
-                            1.,
-                        )),
-                        ..default()
+                        move_id: MoveId(0),
                     },
-                    move_id: MoveId(0),
-                },
-                CollisionGroups::new(Group::NONE, Group::NONE),
-            ))
-            .id();
-        let cell3 = commands
-            .spawn((
-                SnakeCell {
-                    cell_tag: CellTag(rand::random()),
-
-                    collider: Collider::cuboid(collider_size.0, collider_size.1),
-                    sensor: Sensor,
-                    direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
-                    sprite: SpriteBundle {
-                        sprite: Sprite {
-                            color: player.color,
-                            custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                    CollisionGroups::new(Group::NONE, Group::NONE),
+                ))
+                .id();
+            let cell3 = commands
+                .spawn((
+                    SnakeCell {
+                        cell_tag: CellTag(rand::random()),
+        
+                        collider: Collider::cuboid(collider_size.0, collider_size.1),
+                        sensor: Sensor,
+                        direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
+                        sprite: SpriteBundle {
+                            sprite: Sprite {
+                                color: player.color,
+                                custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
+                                ..default()
+                            },
+                            transform: Transform::from_translation(Vec3::new(
+                                initial_position.0 - (cell_size.0 * 2.0),
+                                initial_position.1,
+                                1.,
+                            )),
                             ..default()
                         },
-                        transform: Transform::from_translation(Vec3::new(
-                            initial_position.0 - (cell_size.0 * 2.0),
-                            initial_position.1,
-                            1.,
-                        )),
-                        ..default()
+                        move_id: MoveId(0),
                     },
-                    move_id: MoveId(0),
-                },
-                Tail,
-            ))
-            .id();
-        commands
-            .entity(player_snake)
-            .push_children(&[cell1, cell2, cell3]);
-    }
+                    Tail,
+                ))
+                .id();
+            commands
+                .entity(player_snake)
+                .push_children(&[cell1, cell2, cell3]);
+            }
+        
+    }    
 }
 
 pub fn update_cell_direction(
@@ -302,16 +316,6 @@ pub fn spawn_new_cell(
                             ..default()
                         },
                     };
-                    // cell.1.translation = _move.1
-                    //     + Vec3 {
-                    //         x: extra_distance.x,
-                    //         y: extra_distance.y,
-                    //         z: 0.0,
-                    //     };
-
-                    // if cell.4.is_some() {
-                    //     moves.moves.remove(move_index);
-                    // }
                     let new_tail = commands.spawn(new_cell).insert(Tail).id();
                     commands.entity(snek.0).push_children(&[new_tail]);
                     commands.entity(tail.4).remove::<Tail>();
