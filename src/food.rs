@@ -22,10 +22,12 @@ pub fn spawn_food_system(
     }
     let pad = 20;
     if food_query.is_empty() {
-        let (pos_x, pos_y) = (
-            (rand::random::<f32>() - 0.5) * 1600.0,
-            (rand::random::<f32>() - 0.5) * 1600.0,
-        );
+        let (pos_x, pos_y) = {
+            let rad = rand::random::<f32>() * 900.0;
+            let angle = rand::random::<f32>() * std::f32::consts::PI * 2.0;
+            let (sin,cos) = angle.sin_cos();
+            (rad*sin, rad*cos)
+        };
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
             let food_id = rand::random();
             connection

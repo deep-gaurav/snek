@@ -27,10 +27,12 @@ pub fn setup_snek(
         let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
         let cell_size = config.cell_size;
 
-        let initial_position = (
-            (rand::random::<f32>() - 0.5) * 1600.0,
-            (rand::random::<f32>() - 0.5) * 1600.0,
-        );
+        let initial_position =  {
+            let rad = rand::random::<f32>() * 900.0;
+            let angle = rand::random::<f32>() * std::f32::consts::PI * 2.0;
+            let (sin,cos) = angle.sin_cos();
+            (rad*sin, rad*cos)
+        };
 
         let player_snake = commands
             .spawn((
