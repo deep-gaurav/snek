@@ -76,10 +76,14 @@ pub fn handle_food_collision(
 ) {
     for collision_event in collision_events.iter() {
         if let CollisionEvent::Started(object, collider, _flags) = collision_event {
-            let food = food.get(*collider);
-            let head = head_sensor.get(*object);
+
+            // let heads = head_sensor.iter().map(|e|e.0).collect::<Vec<_>>();
+            // let foods = food.iter().map(|e|e.0).collect::<Vec<_>>();
+
+            let food = food.get(*collider).or(food.get(*object));
+            let head = head_sensor.get(*object).or(head_sensor.get(*collider));
             let cell = body_cell.get(*collider);
-            // info!("Collision food: {:?} head: {:?} cell {:?} object:{object:?}, collider: {collider:?} flags:{_flags:?}", food, head, cell);
+            // info!("Collision food: {:?} head: {:?} cell {:?} object:{object:?}, collider: {collider:?} flags:{_flags:?}\nheads:{heads:?}\nfoods:{foods:?}", food, head, cell);
             if let (Ok(head), Ok(food)) = (head, food) {
                 commands.entity(food.0).despawn_recursive();
                 let headcell = head_cell.get(head.2.get());
