@@ -105,6 +105,8 @@ pub struct PlayerProp {
     pub start_time: Option<(PointInTime, PointInTime)>,
     pub user_id: u32,
     pub color: Color,
+    pub score: u32,
+    pub highest_score: u32,
 }
 
 #[derive(Event)]
@@ -260,6 +262,8 @@ pub fn receive_msgs(
                                             user_id,
                                             color,
                                             start_time: None,
+                                            score:0,
+                                            highest_score:0,
                                         });
                                     }
                                     for user in users.iter() {
@@ -278,6 +282,8 @@ pub fn receive_msgs(
                                             color,
                                             start_time: None,
                                             last_update_time: None,
+                                            score:0,
+                                            highest_score:0,
                                         });
                                         players_changed_ev.send(PlayersChanged {
                                             players: connection.players.clone(),
@@ -311,6 +317,8 @@ pub fn receive_msgs(
                                         color,
                                         start_time: None,
                                         last_update_time: None,
+                                        score:0,
+                                        highest_score:0,
                                     });
                                     players_changed_ev.send(PlayersChanged {
                                         players: connection.players.clone(),

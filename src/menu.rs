@@ -161,7 +161,7 @@ pub fn entry_menu(
                     let mut rng = rand::thread_rng();
                     let random_number: u32 = rng.gen_range(100_000..1_000_000);
                     let random_string = format!("{:06}", random_number);
-                
+
                     connect_transport(&random_string, connection_handler);
                     break;
                 } else if join_button.get(interaction.0).is_ok() {
@@ -194,7 +194,7 @@ pub fn entry_menu(
                             input.sections = vec![new_section];
                         }
                     }
-                }else if let Ok(but) = q_join_submit_button.get(interaction.0) {
+                } else if let Ok(but) = q_join_submit_button.get(interaction.0) {
                     if let Ok(mut input) = room_input.get_single_mut() {
                         if let Some(section) = input.sections.first() {
                             if section.value.len() == 6 {

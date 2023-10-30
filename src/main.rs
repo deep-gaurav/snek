@@ -6,6 +6,7 @@ pub mod networking;
 pub mod snek;
 pub mod terrain;
 pub mod window;
+pub mod scoring;
 
 use bevy::{
     input::touch::TouchPhase,
@@ -24,6 +25,7 @@ use networking::{
     AddMove, AddSpawn, ConnectionState, PingTimer, PlayersChanged, SendMessage, SnakeSyncTimer,
     SnakeUpdate, TransportMessage,
 };
+use scoring::{sync_scores, setup_score, display_scores};
 use serde::{Deserialize, Serialize};
 use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor, KillSnake, SpawnSnake, spawn_snek};
 use terrain::{setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
@@ -193,7 +195,7 @@ fn main() {
     .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
     .add_systems(Startup, setup)
     .add_systems(OnEnter(GameStates::EntryMenu), setup_menu)
-    .add_systems(OnEnter(GameStates::GamePlay), setup_snek)
+    .add_systems(OnEnter(GameStates::GamePlay), (setup_snek,setup_score))
     .add_systems(OnExit(GameStates::EntryMenu), clean_entry_menu)
     .add_systems(Update, entry_menu.run_if(in_state(GameStates::EntryMenu)))
     .add_systems(OnEnter(GameStates::Lobby), setup_lobby_menu)
@@ -216,6 +218,7 @@ fn main() {
                 spawn_food_system,
                 handle_food_collision,
                 spawn_snek,
+                display_scores,
             )
                 .run_if(in_state(GameStates::GamePlay)),
             sync_cam,
@@ -235,6 +238,7 @@ fn main() {
                 sync_food_pointer,
                 respawn_menu_system,
                 respawn_handle_button,
+                sync_scores,
             )
                 .run_if(in_state(GameStates::GamePlay)),
         ),

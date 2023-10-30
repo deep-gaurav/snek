@@ -46,7 +46,7 @@ pub struct GameOvermenu;
 #[derive(Component)]
 pub struct RespawnButton;
 
-pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, head: Query<&Head>, mut commands: Commands){
+pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, head: Query<&Head>, mut commands: Commands, connection_handler: Res<ConnectionState>){
 
     if head.is_empty() && game_over_menu.is_empty() {
         info!("You died");
@@ -74,11 +74,37 @@ pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, he
                 parent.spawn(TextBundle::from_section(
                     "You died",
                     TextStyle {
-                        font_size: 40.0,
+                        font_size: 50.0,
                         color: Color::rgb(0.9, 0.9, 0.9),
                         ..default()
                     },
                 ));
+                if let ConnectionState::Connected(conenction) = connection_handler.as_ref(){
+                    if let Some(player_id) = conenction.self_id{
+                        if let Some(player) = conenction.players.iter().find(|p|p.user_id==player_id){
+                            parent.spawn(TextBundle::from_section(
+                                format!("Score: {}", player.score),
+                                TextStyle {
+                                    font_size: 30.0,
+                                    color: Color::rgb(0.9, 0.9, 0.9),
+                                    ..default()
+                                },
+                            ));
+                            parent.spawn(TextBundle::from_section(
+                                if player.score==player.highest_score {
+                                    format!("Your Highest Score!!")
+                                }else{
+                                    format!("Your Highest Score: {}", player.highest_score)
+                                },
+                                TextStyle {
+                                    font_size: 30.0,
+                                    color: Color::rgb(0.9, 0.9, 0.9),
+                                    ..default()
+                                },
+                            ));
+                        }
+                    }
+                }
                 parent.spawn((
                     RespawnButton,
                     ButtonBundle {
