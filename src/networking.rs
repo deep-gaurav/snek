@@ -15,6 +15,9 @@ use serde::{Deserialize, Serialize};
 use xwebtransport::current::Connection;
 use xwebtransport_core::{datagram::Receive, AcceptUniStream, Connecting, EndpointConnect};
 
+#[cfg(not(target_family = "wasm"))]
+use bevy_tokio_tasks::TokioTasksRuntime;
+
 use crate::{
     food::{spawn_food, Food},
     snek::KillSnake,
@@ -131,69 +134,42 @@ pub struct AddMove {
 #[derive(Component)]
 pub struct ReceivedMsgTask(Task<ReceiveMessage>);
 
-pub fn connect_transport(room_id: &str, mut connection_handler: ResMut<ConnectionState>) {
+pub fn connect_transport(
+    room_id: &str,
+    mut connection_handler: ResMut<ConnectionState>,
+    #[cfg(not(target_family = "wasm"))] runtime: ResMut<TokioTasksRuntime>,
+) {
+    println!("Connect called");
+
     let thread_pool = AsyncComputeTaskPool::get();
-    let endpoint = xwebtransport::current::Endpoint {
-        ..Default::default()
-    };
+
     let (sender_tx, sender_rx) = flume::unbounded();
     let (receiver_tx, receiver_rx) = flume::unbounded();
     let room_id_c = room_id.to_string();
-    let task = thread_pool
+
+    println!("Running task");
+    cfg_if::cfg_if! {
+        if #[cfg(target_family = "wasm")] {
+
+                let task = thread_pool
         .spawn(async move {
-            let connection = endpoint
-                .connect(&format!(
-                    "https://web-room-relay.deepwith.in:4433/room/{room_id_c}",
-                ))
-                .await;
-            if let Ok(connection) = connection {
-                if let Ok(connection) = connection.wait_connect().await {
-                    if let Err(err) = receiver_tx.send(ReceiveMessage::ConnectionEstablished) {
-                        warn!("Failed to send rcv {err:?}")
-                    }
-                    let mut send_msg_fut = None;
-                    loop {
-                        let send_msg_fut_local = send_msg_fut.take();
-                        let resp = futures::future::select(
-                            sender_rx.recv_async(),
-                            match send_msg_fut_local {
-                                Some(val) => val,
-                                None => connection.receive_datagram(),
-                            },
-                        )
-                        .await;
-                        match resp {
-                            futures::future::Either::Left((send_msg, data_gram_fut)) => {
-                                send_msg_fut = Some(data_gram_fut);
-                                if let Ok(msg) = send_msg {
-                                    if let SendMessage::TransportMessage(msg) = msg {
-                                        let bin = bincode::serialize(&msg)
-                                            .ok()
-                                            // .and_then(|val| zstd::encode_all(val, 0).ok())
-                                            ;
-                                        if let Some(bin) = bin {
-                                            use xwebtransport_core::datagram::Send;
-                                            connection.send_datagram(&bin).await;
-                                        }
-                                    }
-                                }
-                            }
-                            futures::future::Either::Right((datagram, send_msg_fut)) => {
-                                let res = match datagram {
-                                    Ok(datagram) => receiver_tx
-                                        .send(ReceiveMessage::DatagramReceived(datagram.to_vec())),
-                                    Err(err) => receiver_tx.send(ReceiveMessage::ConnectionError),
-                                };
-                                if let Err(err) = res {
-                                    warn!("{err:?}")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+
+            send_receive_background(room_id_c, receiver_tx, sender_rx).await
         })
         .detach();
+
+        } else {
+
+            runtime.spawn_background_task(|_ctx| async move {
+
+                use wtransport::ClientConfig;
+                let config = ClientConfig::default();
+                let endpoint = wtransport::Endpoint::client(config).unwrap();
+                send_receive_background(room_id_c, endpoint, receiver_tx, sender_rx).await
+            });
+
+        }
+    }
     *connection_handler.as_mut() = ConnectionState::Connected(ConnectionHandler {
         self_id: None,
         players: vec![],
@@ -201,6 +177,93 @@ pub fn connect_transport(room_id: &str, mut connection_handler: ResMut<Connectio
         receiver: receiver_rx,
         room_id: room_id.to_string(),
     });
+}
+
+async fn send_receive_background(
+    room_id_c: String,
+    #[cfg(not(target_family = "wasm"))] endpoint: wtransport::Endpoint<
+        wtransport::endpoint::endpoint_side::Client,
+    >,
+    receiver_tx: Sender<ReceiveMessage>,
+    sender_rx: Receiver<SendMessage>,
+) {
+    cfg_if::cfg_if! {
+        if #[cfg(target_family = "wasm")] {
+            let endpoint = xwebtransport::current::Endpoint {
+                ..Default::default()
+            };
+        } else {
+        }
+    }
+    let connection = endpoint
+        .connect(&format!(
+            "https://web-room-relay.deepwith.in:4433/room/{room_id_c}",
+        ))
+        .await;
+    if let Ok(connection) = connection {
+        cfg_if::cfg_if! {
+            if #[cfg(target_family = "wasm")] {
+                let Ok(connection) = connection.wait_connect().await else{
+                    return;
+                };
+            } else {
+            }
+        }
+        if let Err(err) = receiver_tx.send(ReceiveMessage::ConnectionEstablished) {
+            warn!("Failed to send rcv {err:?}")
+        }
+        let mut send_msg_fut = None;
+        loop {
+            let send_msg_fut_local = send_msg_fut.take();
+            let resp = futures::future::select(
+                sender_rx.recv_async(),
+                match send_msg_fut_local {
+                    Some(val) => val,
+                    None => Box::pin(connection.receive_datagram()),
+                },
+            )
+            .await;
+
+            match resp {
+                futures::future::Either::Left((send_msg, data_gram_fut)) => {
+                    send_msg_fut = Some(data_gram_fut);
+                    if let Ok(msg) = send_msg {
+                        if let SendMessage::TransportMessage(msg) = msg {
+                            let bin = bincode::serialize(&msg)
+                                    .ok()
+                                    // .and_then(|val| zstd::encode_all(val, 0).ok())
+                                    ;
+                            if let Some(bin) = bin {
+                                use xwebtransport_core::datagram::Send;
+                                cfg_if::cfg_if! {
+                                    if #[cfg(target_family = "wasm")] {
+                                        connection.send_datagram(&bin).await;
+
+                                    } else {
+                                        connection.send_datagram(&bin);
+
+                                    }
+                                }
+                            }
+                        }
+                    }else{
+                        break;
+                    }
+                }
+                futures::future::Either::Right((datagram, send_msg_fut)) => {
+                    let res = match datagram {
+                        Ok(datagram) => {
+                            receiver_tx.send(ReceiveMessage::DatagramReceived(datagram.to_vec()))
+                        }
+                        Err(err) => receiver_tx.send(ReceiveMessage::ConnectionError),
+                    };
+                    if let Err(err) = res {
+                        warn!("{err:?}")
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub fn receive_msgs(
@@ -221,7 +284,7 @@ pub fn receive_msgs(
     match connection_handler.as_mut() {
         ConnectionState::NotConnected => {}
         ConnectionState::Connected(connection) => {
-            if let Some(msg) =  connection.receiver.try_iter().next() {
+            if let Some(msg) = connection.receiver.try_iter().next() {
                 print!("Connection established");
                 match msg {
                     ReceiveMessage::ConnectionEstablished => {
@@ -254,8 +317,8 @@ pub fn receive_msgs(
                                             user_id,
                                             color,
                                             start_time: None,
-                                            score:0,
-                                            highest_score:0,
+                                            score: 0,
+                                            highest_score: 0,
                                         });
                                     }
                                     for user in users.iter() {
@@ -274,8 +337,8 @@ pub fn receive_msgs(
                                             color,
                                             start_time: None,
                                             last_update_time: None,
-                                            score:0,
-                                            highest_score:0,
+                                            score: 0,
+                                            highest_score: 0,
                                         });
                                         players_changed_ev.send(PlayersChanged {
                                             players: connection.players.clone(),
@@ -309,8 +372,8 @@ pub fn receive_msgs(
                                         color,
                                         start_time: None,
                                         last_update_time: None,
-                                        score:0,
-                                        highest_score:0,
+                                        score: 0,
+                                        highest_score: 0,
                                     });
                                     players_changed_ev.send(PlayersChanged {
                                         players: connection.players.clone(),
@@ -357,7 +420,7 @@ pub fn receive_msgs(
                                                 update_time,
                                                 snake_details,
                                             ) => {
-                                                if next_state.0 != Some(GameStates::GamePlay){
+                                                if next_state.0 != Some(GameStates::GamePlay) {
                                                     next_state.set(GameStates::GamePlay)
                                                 }
                                                 snake_update.send(SnakeUpdate {
@@ -365,7 +428,7 @@ pub fn receive_msgs(
                                                     user_id: user_id,
                                                     snake_details,
                                                 })
-                                            },
+                                            }
                                             TransportMessage::AddMove(update_time, _move) => {
                                                 let player = connection
                                                     .players
@@ -434,12 +497,10 @@ pub fn ping_send(
     ping_tick.timer.tick(time.delta());
     if ping_tick.timer.finished() {
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-            let t=  time.elapsed_seconds();
+            let t = time.elapsed_seconds();
             connection
                 .sender
-                .send(SendMessage::TransportMessage(TransportMessage::Ping(
-                   t
-                )));
+                .send(SendMessage::TransportMessage(TransportMessage::Ping(t)));
         }
     }
 }

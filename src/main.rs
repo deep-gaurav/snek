@@ -247,6 +247,10 @@ fn main() {
 
     #[cfg(debug_assertions)]
     debug_plugins(&mut app);
+
+    #[cfg(not(target_family = "wasm"))]
+    setup_tokio(&mut app);
+    
     app.run()
 }
 #[cfg(debug_assertions)]
@@ -258,6 +262,11 @@ fn debug_plugins(app: &mut App) {
     // app.add_plugins(LogDiagnosticsPlugin::default());
     // app.add_plugins(FrameTimeDiagnosticsPlugin::default());
     // app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn setup_tokio(app: &mut App){
+    app.add_plugins(bevy_tokio_tasks::TokioTasksPlugin::default());
 }
 
 fn setup(

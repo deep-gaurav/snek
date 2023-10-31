@@ -216,6 +216,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-compat"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f68a707c1feb095d8c07f8a65b9f506b117d30af431cab89374357de7c11461b"
+dependencies = [
+ "futures-core",
+ "futures-io",
+ "once_cell",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "async-executor"
 version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -295,6 +308,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91c6d3ec4f89e85294dc97334c5b271ddc301fdf67ac9bb994fe44d9273e6ed7"
 dependencies = [
  "bevy_internal",
+]
+
+[[package]]
+name = "bevy-tokio-tasks"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a99580a342280fa79a3ed8c0c28ab32ea0e476e0b580b93d55dee54bd37b100"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "tokio",
 ]
 
 [[package]]
@@ -1963,6 +1987,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hermit-abi"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d77f7ec81a6d05a3abb01ab6eb7590f6083d08449fe5a1c8b1e620283546ccb7"
+
+[[package]]
 name = "hexasphere"
 version = "9.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2522,6 +2552,16 @@ checksum = "f30b0abd723be7e2ffca1272140fac1a2f084c77ec3e123c192b66af1ee9e6c2"
 dependencies = [
  "autocfg",
  "libm",
+]
+
+[[package]]
+name = "num_cpus"
+version = "1.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
+dependencies = [
+ "hermit-abi",
+ "libc",
 ]
 
 [[package]]
@@ -3372,9 +3412,12 @@ name = "snek"
 version = "0.1.0"
 dependencies = [
  "async-channel",
+ "async-compat",
  "bevy",
+ "bevy-tokio-tasks",
  "bevy_rapier2d",
  "bincode",
+ "cfg-if",
  "flate3",
  "flume",
  "futures",
@@ -3383,6 +3426,7 @@ dependencies = [
  "serde",
  "wasm-bindgen-futures",
  "web-sys",
+ "wtransport",
  "xwebtransport",
  "xwebtransport-core",
 ]
@@ -3577,6 +3621,7 @@ dependencies = [
  "backtrace",
  "libc",
  "mio",
+ "num_cpus",
  "pin-project-lite",
  "socket2",
  "tokio-macros",
@@ -4283,9 +4328,9 @@ dependencies = [
 
 [[package]]
 name = "wtransport"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fa96a6f79c307047127eb1674947bc583e95107833ff3a7d8f86eb6dfce6dbd"
+checksum = "c14e2f72e73898b8369710f9ab04b52671ecd5c234453594e5e25838a91bccc3"
 dependencies = [
  "bytes",
  "quinn",
@@ -4302,9 +4347,9 @@ dependencies = [
 
 [[package]]
 name = "wtransport-proto"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "754c71e12f250ffb11247e254fee5d6d52c6d2564211cc9577f74ec63cd3587b"
+checksum = "79dd49f3326280fb4b7a09638d563d84ea7ad225eb5324e91a0db7169caa94a3"
 dependencies = [
  "ls-qpack",
  "octets",
