@@ -221,7 +221,7 @@ pub fn receive_msgs(
     match connection_handler.as_mut() {
         ConnectionState::NotConnected => {}
         ConnectionState::Connected(connection) => {
-            for msg in connection.receiver.try_iter() {
+            if let Some(msg) =  connection.receiver.try_iter().next() {
                 print!("Connection established");
                 match msg {
                     ReceiveMessage::ConnectionEstablished => {
@@ -356,11 +356,16 @@ pub fn receive_msgs(
                                             TransportMessage::SnakeUpdate(
                                                 update_time,
                                                 snake_details,
-                                            ) => snake_update.send(SnakeUpdate {
-                                                update_time: update_time,
-                                                user_id: user_id,
-                                                snake_details,
-                                            }),
+                                            ) => {
+                                                if next_state.0 != Some(GameStates::GamePlay){
+                                                    next_state.set(GameStates::GamePlay)
+                                                }
+                                                snake_update.send(SnakeUpdate {
+                                                    update_time: update_time,
+                                                    user_id: user_id,
+                                                    snake_details,
+                                                })
+                                            },
                                             TransportMessage::AddMove(update_time, _move) => {
                                                 let player = connection
                                                     .players
@@ -429,10 +434,11 @@ pub fn ping_send(
     ping_tick.timer.tick(time.delta());
     if ping_tick.timer.finished() {
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
+            let t=  time.elapsed_seconds();
             connection
                 .sender
                 .send(SendMessage::TransportMessage(TransportMessage::Ping(
-                    time.elapsed_seconds(),
+                   t
                 )));
         }
     }
