@@ -4,10 +4,10 @@ use bevy_rapier2d::prelude::{Collider, CollisionEvent, Sensor};
 use crate::{
     networking::{ConnectionState, SendMessage, TransportMessage},
     snek::KillSnake,
-    CellTag, GameConfig, HeadSensor, Host, SnakeTag, Spawner,
+    CellTag, GameConfig, HeadSensor, Host, MoveId, SnakeCell, SnakeTag, Tail,
 };
 
-#[derive(Component,Debug)]
+#[derive(Component, Debug)]
 pub struct Food(pub u32);
 
 pub fn spawn_food_system(
@@ -25,8 +25,8 @@ pub fn spawn_food_system(
         let (pos_x, pos_y) = {
             let rad = rand::random::<f32>() * 900.0;
             let angle = rand::random::<f32>() * std::f32::consts::PI * 2.0;
-            let (sin,cos) = angle.sin_cos();
-            (rad*sin, rad*cos)
+            let (sin, cos) = angle.sin_cos();
+            (rad * sin, rad * cos)
         };
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
             let food_id = rand::random();
@@ -68,15 +68,17 @@ pub fn handle_food_collision(
     food: Query<(Entity, &Food)>,
     head_cell: Query<(&Parent, &Transform, &crate::Direction)>,
     body_cell: Query<(Entity), With<CellTag>>,
-    mut snek: Query<&mut Spawner>,
+    // mut snek: Query<&mut Spawner>,
+    mut snek: Query<(Entity, &SnakeTag)>,
     mut commands: Commands,
     connection_handler: Res<ConnectionState>,
     snek_main: Query<(Entity, &SnakeTag)>,
     mut snake_kill_writer: EventWriter<KillSnake>,
+    config: Res<GameConfig>,
+    tail: Query<(&Parent, &Transform, &crate::Direction, &MoveId, Entity), With<Tail>>,
 ) {
     for collision_event in collision_events.iter() {
         if let CollisionEvent::Started(object, collider, _flags) = collision_event {
-
             // let heads = head_sensor.iter().map(|e|e.0).collect::<Vec<_>>();
             // let foods = food.iter().map(|e|e.0).collect::<Vec<_>>();
 
@@ -88,21 +90,62 @@ pub fn handle_food_collision(
                 commands.entity(food.0).despawn_recursive();
                 let headcell = head_cell.get(head.2.get());
                 if let Ok(headcell) = headcell {
-                    if let Ok(mut snek) = snek.get_mut(headcell.0.get()) {
-                        let spawn = (headcell.1.translation, headcell.2.clone());
-                        snek.spawners.push(spawn.clone());
+                    let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
+                    let snek = snek.iter().find(|p| p.1 == &SnakeTag::SelfPlayerSnake);
+                    if let Some(snek) = snek {
+                        let tail = tail.iter().find(|tail| tail.0.get() == snek.0);
+                        if let Some(tail) = tail {
+                            if let ConnectionState::Connected(connection) =
+                                connection_handler.as_ref()
+                            {
+                                if let Some(player_id) = connection.self_id {
+                                    if let Some(player) =
+                                        connection.players.iter().find(|p| p.user_id == player_id)
+                                    {
+                                        let tail_position = tail.1.translation
+                                            - Vec3 {
+                                                x: tail.2 .0.x * config.cell_size.0,
+                                                y: tail.2 .0.y * config.cell_size.1,
+                                                z: 0.0,
+                                            };
+                                        let new_cell = SnakeCell {
+                                            cell_tag: CellTag(rand::random()),
 
-                        if let ConnectionState::Connected(connection) = connection_handler.as_ref()
-                        {
-                            if let Err(err) = connection.sender.send(SendMessage::TransportMessage(
-                                TransportMessage::DespawnFood(food.1 .0),
-                            )) {
-                                warn!("{err:?}")
-                            }
-                            if let Err(err) = connection.sender.send(SendMessage::TransportMessage(
-                                TransportMessage::AddSpawn(spawn),
-                            )) {
-                                warn!("{err:?}")
+                                            collider: Collider::cuboid(
+                                                collider_size.0,
+                                                collider_size.1,
+                                            ),
+                                            sensor: Sensor,
+                                            direction: crate::Direction(tail.2 .0),
+                                            move_id: MoveId(tail.3 .0),
+                                            sprite: SpriteBundle {
+                                                sprite: Sprite {
+                                                    color: player.color,
+                                                    custom_size: Some(Vec2::new(
+                                                        config.cell_size.0,
+                                                        config.cell_size.1,
+                                                    )),
+                                                    ..default()
+                                                },
+                                                transform: Transform::from_translation(
+                                                    tail_position,
+                                                ),
+                                                ..default()
+                                            },
+                                        };
+                                        let new_tail = commands.spawn(new_cell).insert(Tail).id();
+                                        commands.entity(snek.0).push_children(&[new_tail]);
+                                        commands.entity(tail.4).remove::<Tail>();
+                                    }
+
+                                    if let Err(err) =
+                                        connection.sender.send(SendMessage::TransportMessage(
+                                            TransportMessage::DespawnFood(food.1 .0),
+                                        ))
+                                    {
+                                        warn!("{err:?}")
+                                    }
+                                }
                             }
                         }
                     }
@@ -191,7 +234,12 @@ pub fn sync_food_pointer(
     if let Some(dist) = dist {
         let pt = ray.get_point(dist);
         let angle = Vec2 { x: -1.0, y: 0.0 }.angle_between(ray.direction.truncate().normalize());
-        let visible = camera_transform.translation().truncate().distance_squared(food_pos.translation.truncate())> pt.truncate().distance_squared(camera_transform.translation().truncate());
+        let visible = camera_transform
+            .translation()
+            .truncate()
+            .distance_squared(food_pos.translation.truncate())
+            > pt.truncate()
+                .distance_squared(camera_transform.translation().truncate());
 
         let Ok(mut pointer_transform) = transform.get_mut(pointer) else {
             return;

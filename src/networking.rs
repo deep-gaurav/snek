@@ -19,7 +19,7 @@ use crate::{
     food::{spawn_food, Food},
     snek::KillSnake,
     CellTag, Direction, GameConfig, GameStates, Host, LastMoveId, Move, MoveId, Moves, Snake,
-    SnakeCell, SnakeTag, SpawnDetail, Spawner,
+    SnakeCell, SnakeTag, SpawnDetail,
 };
 
 pub enum SendMessage {
@@ -34,7 +34,6 @@ pub enum TransportMessage {
     // InformPlayers(Vec<PlayerProp>),
     SnakeUpdate(PointInTime, SnakeDetails),
     AddMove(PointInTime, Move),
-    AddSpawn(SpawnDetail),
     StartGame(PointInTime),
     SpawnFood(u32, Vec2),
     KillSnake,
@@ -47,7 +46,7 @@ pub enum TransportMessage {
 pub struct SnakeDetails {
     transform: Transform,
     moves: Moves,
-    spawners: Spawner,
+    // spawners: Spawner,
     cells: Vec<SnakeCellDetails>,
 }
 
@@ -127,12 +126,6 @@ pub struct AddMove {
     update_time: PointInTime,
     user_id: u32,
     _move: Move,
-}
-
-#[derive(Event)]
-pub struct AddSpawn {
-    user_id: u32,
-    spawn: SpawnDetail,
 }
 
 #[derive(Component)]
@@ -217,7 +210,6 @@ pub fn receive_msgs(
     current_state: Res<State<GameStates>>,
     mut snake_update: EventWriter<SnakeUpdate>,
     mut add_move: EventWriter<AddMove>,
-    mut add_spawn: EventWriter<AddSpawn>,
     mut players_changed_ev: EventWriter<PlayersChanged>,
     mut host: Query<Entity, With<Host>>,
     food: Query<(Entity, &Food)>,
@@ -384,9 +376,6 @@ pub fn receive_msgs(
                                                 })
                                             }
 
-                                            TransportMessage::AddSpawn(spawn) => {
-                                                add_spawn.send(AddSpawn { user_id, spawn })
-                                            }
                                             // TransportMessage::InformPlayers(players) => {
                                             //     connection.players = players;
                                             //     for host in host.iter() {
@@ -451,7 +440,7 @@ pub fn ping_send(
 
 pub fn send_snake_send(
     transforms: Query<(&Transform), Or<(With<SnakeTag>, With<CellTag>)>>,
-    moves_spawners: Query<(&Moves, &Spawner)>,
+    moves: Query<(&Moves)>,
     moveid_direc: Query<(&Direction, &MoveId, &CellTag)>,
     snake: Query<(Entity, &SnakeTag)>,
     snake_cells: Query<(&Parent, Entity), With<CellTag>>,
@@ -471,11 +460,10 @@ pub fn send_snake_send(
     let Ok(snake_tranform) = transforms.get(self_snake).cloned() else {
         return;
     };
-    let Ok((moves, spawner)) = moves_spawners.get(self_snake) else {
+    let Ok(moves) = moves.get(self_snake) else {
         return;
     };
     let moves = moves.clone();
-    let spawners = spawner.clone();
 
     let snake_cells = snake_cells
         .iter()
@@ -495,7 +483,6 @@ pub fn send_snake_send(
         transform: snake_tranform,
         cells: snake_cells,
         moves,
-        spawners,
     };
     match connection_handler.as_ref() {
         ConnectionState::NotConnected => {}
@@ -516,7 +503,6 @@ pub fn update_snake(
     cells: Query<(Entity, &CellTag)>,
     config: Res<GameConfig>,
     mut moves: Query<&mut Moves>,
-    mut spawners: Query<&mut Spawner>,
     mut move_id: Query<&mut MoveId>,
     mut direction: Query<&mut Direction>,
     mut transmform: Query<&mut Transform, Or<(With<CellTag>, With<SnakeTag>)>>,
@@ -552,7 +538,6 @@ pub fn update_snake(
         if let Some(mut snake) = snake {
             *transmform.get_mut(snake.0).unwrap() = event.snake_details.transform;
             *moves.get_mut(snake.0).unwrap() = event.snake_details.moves.clone();
-            *spawners.get_mut(snake.0).unwrap() = event.snake_details.spawners.clone();
             for cell in event.snake_details.cells.iter() {
                 let cell_entity = cells.iter().find(|p| p.1 == &cell.cell_tag);
                 let compensation_time =
@@ -609,7 +594,6 @@ pub fn update_snake(
 
                     lastmove: LastMoveId(0),
                     moves: event.snake_details.moves.clone(),
-                    spawners: event.snake_details.spawners.clone(),
                 },))
                 .with_children(|parent| {
                     for cell in event.snake_details.cells.iter() {
@@ -646,21 +630,6 @@ pub fn sync_add_move(
             if let SnakeTag::OtherPlayerSnake(id) = snake {
                 if id == &_move.user_id {
                     moves.moves.push(_move._move.clone());
-                }
-            }
-        }
-    }
-}
-
-pub fn sync_add_spawner(
-    mut spawner: Query<(&mut Spawner, &SnakeTag)>,
-    mut add_spawn: EventReader<AddSpawn>,
-) {
-    for spawn in add_spawn.iter() {
-        for (mut spawner, snake) in spawner.iter_mut() {
-            if let SnakeTag::OtherPlayerSnake(id) = snake {
-                if id == &spawn.user_id {
-                    spawner.spawners.push(spawn.spawn.clone());
                 }
             }
         }

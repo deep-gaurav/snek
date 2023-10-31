@@ -21,13 +21,13 @@ use game_over::{check_snek_position, handle_kill_snake, respawn_menu_system, res
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
-    ping_send, receive_msgs, send_snake_send, sync_add_move, sync_add_spawner, update_snake,
-    AddMove, AddSpawn, ConnectionState, PingTimer, PlayersChanged, SendMessage, SnakeSyncTimer,
+    ping_send, receive_msgs, send_snake_send, sync_add_move,  update_snake,
+    AddMove, ConnectionState, PingTimer, PlayersChanged, SendMessage, SnakeSyncTimer,
     SnakeUpdate, TransportMessage,
 };
 use scoring::{sync_scores, setup_score, display_scores};
 use serde::{Deserialize, Serialize};
-use snek::{setup_snek, spawn_new_cell, update_cell_direction, update_head_sensor, KillSnake, SpawnSnake, spawn_snek};
+use snek::{setup_snek,  update_cell_direction, update_head_sensor, KillSnake, SpawnSnake, spawn_snek};
 use terrain::{setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
 use window::{get_height, get_width};
 
@@ -44,7 +44,6 @@ pub struct Snake {
     spatial: SpatialBundle,
     lastmove: LastMoveId,
     moves: Moves,
-    spawners: Spawner,
 }
 
 #[derive(Component)]
@@ -96,10 +95,10 @@ pub struct Moves {
 
 pub type SpawnDetail = (Vec3, Direction);
 
-#[derive(Component, Serialize, Deserialize, Clone)]
-pub struct Spawner {
-    pub spawners: Vec<SpawnDetail>,
-}
+// #[derive(Component, Serialize, Deserialize, Clone)]
+// pub struct Spawner {
+//     pub spawners: Vec<SpawnDetail>,
+// }
 
 #[derive(Component)]
 pub struct Head;
@@ -167,7 +166,6 @@ fn main() {
     .add_event::<ChangeDirection>()
     .add_event::<InputsActions>()
     .add_event::<SnakeUpdate>()
-    .add_event::<AddSpawn>()
     .add_event::<AddMove>()
     .add_event::<PlayersChanged>()
     .add_event::<KillSnake>()
@@ -209,12 +207,11 @@ fn main() {
         (
             (
                 update_cell_direction,
-                move_cells.before(spawn_new_cell),
+                move_cells.before(handle_food_collision),
                 keyboard_input,
                 handle_touch,
                 handle_input_event,
                 update_head_sensor,
-                spawn_new_cell,
                 spawn_food_system,
                 handle_food_collision,
                 spawn_snek,
@@ -234,7 +231,6 @@ fn main() {
             (
                 update_snake,
                 sync_add_move,
-                sync_add_spawner,
                 sync_food_pointer,
                 respawn_menu_system,
                 respawn_handle_button,

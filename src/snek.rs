@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 
 use crate::{
     networking::ConnectionState, CellTag, ChangeDirection, GameConfig, Head, HeadSensor,
-    LastMoveId, MainCamera, MoveId, Moves, Player, Snake, SnakeCell, SnakeTag, Spawner, Tail,
+    LastMoveId, MainCamera, MoveId, Moves, Player, Snake, SnakeCell, SnakeTag,  Tail,
 };
 
 #[derive(Event)]
@@ -54,7 +54,6 @@ pub fn spawn_snek(
         
                         lastmove: LastMoveId(0),
                         moves: Moves { moves: vec![] },
-                        spawners: Spawner { spawners: vec![] },
                     },
                     Player,
                 ))
@@ -251,77 +250,77 @@ pub fn update_head_sensor(
     }
 }
 
-pub fn spawn_new_cell(
-    mut commands: Commands,
-    mut snek: Query<(Entity, &mut Spawner, &SnakeTag)>,
-    connection_handler: Res<ConnectionState>,
-    config: Res<GameConfig>,
-    tail: Query<(&Parent, &Transform, &crate::Direction, &MoveId, Entity), With<Tail>>,
-) {
-    let ConnectionState::Connected(connection) = connection_handler.as_ref() else {
-        return;
-    };
-    let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
-    for mut snek in snek.iter_mut() {
-        let snake_user_id = match snek.2 {
-            SnakeTag::SelfPlayerSnake => {
-                let Some(id) = connection.self_id else {
-                    continue;
-                };
-                id
-            }
-            SnakeTag::OtherPlayerSnake(id) => *id,
-        };
-        let Some(player) = connection
-            .players
-            .iter()
-            .find(|p| p.user_id == snake_user_id)
-        else {
-            continue;
-        };
-        if let Some((point_index, spawn_point)) = snek.1.spawners.iter().enumerate().next() {
-            let tail = tail.iter().find(|tail| tail.0.get() == snek.0);
-            if let Some(tail) = tail {
-                let mut current_dir = tail.2;
-                let tail_position = tail.1.translation
-                    - Vec3 {
-                        x: current_dir.0.x * config.cell_size.0,
-                        y: current_dir.0.y * config.cell_size.1,
-                        z: 0.0,
-                    };
-                let distance = tail.1.translation - spawn_point.0;
-                let distance_vec2 = Vec2 {
-                    x: distance.x,
-                    y: distance.y,
-                };
-                if distance_vec2.distance(Vec2::ZERO) < 1.0 {
-                    let extra_distance = spawn_point.1 .0 * distance_vec2.distance(Vec2::ZERO);
-                    let new_cell = SnakeCell {
-                        cell_tag: CellTag(rand::random()),
+// pub fn spawn_new_cell(
+//     mut commands: Commands,
+//     mut snek: Query<(Entity, &mut Spawner, &SnakeTag)>,
+//     connection_handler: Res<ConnectionState>,
+//     config: Res<GameConfig>,
+//     tail: Query<(&Parent, &Transform, &crate::Direction, &MoveId, Entity), With<Tail>>,
+// ) {
+//     let ConnectionState::Connected(connection) = connection_handler.as_ref() else {
+//         return;
+//     };
+//     let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
+//     for mut snek in snek.iter_mut() {
+//         let snake_user_id = match snek.2 {
+//             SnakeTag::SelfPlayerSnake => {
+//                 let Some(id) = connection.self_id else {
+//                     continue;
+//                 };
+//                 id
+//             }
+//             SnakeTag::OtherPlayerSnake(id) => *id,
+//         };
+//         let Some(player) = connection
+//             .players
+//             .iter()
+//             .find(|p| p.user_id == snake_user_id)
+//         else {
+//             continue;
+//         };
+//         if let Some((point_index, spawn_point)) = snek.1.spawners.iter().enumerate().next() {
+//             let tail = tail.iter().find(|tail| tail.0.get() == snek.0);
+//             if let Some(tail) = tail {
+//                 let mut current_dir = tail.2;
+//                 let tail_position = tail.1.translation
+//                     - Vec3 {
+//                         x: current_dir.0.x * config.cell_size.0,
+//                         y: current_dir.0.y * config.cell_size.1,
+//                         z: 0.0,
+//                     };
+//                 let distance = tail.1.translation - spawn_point.0;
+//                 let distance_vec2 = Vec2 {
+//                     x: distance.x,
+//                     y: distance.y,
+//                 };
+//                 if distance_vec2.distance(Vec2::ZERO) < 1.0 {
+//                     let extra_distance = spawn_point.1 .0 * distance_vec2.distance(Vec2::ZERO);
+//                     let new_cell = SnakeCell {
+//                         cell_tag: CellTag(rand::random()),
 
-                        collider: Collider::cuboid(collider_size.0, collider_size.1),
-                        sensor: Sensor,
-                        direction: crate::Direction(tail.2 .0),
-                        move_id: MoveId(tail.3 .0),
-                        sprite: SpriteBundle {
-                            sprite: Sprite {
-                                color: player.color,
-                                custom_size: Some(Vec2::new(
-                                    config.cell_size.0,
-                                    config.cell_size.1,
-                                )),
-                                ..default()
-                            },
-                            transform: Transform::from_translation(tail_position),
-                            ..default()
-                        },
-                    };
-                    let new_tail = commands.spawn(new_cell).insert(Tail).id();
-                    commands.entity(snek.0).push_children(&[new_tail]);
-                    commands.entity(tail.4).remove::<Tail>();
-                    snek.1.spawners.remove(point_index);
-                }
-            }
-        }
-    }
-}
+//                         collider: Collider::cuboid(collider_size.0, collider_size.1),
+//                         sensor: Sensor,
+//                         direction: crate::Direction(tail.2 .0),
+//                         move_id: MoveId(tail.3 .0),
+//                         sprite: SpriteBundle {
+//                             sprite: Sprite {
+//                                 color: player.color,
+//                                 custom_size: Some(Vec2::new(
+//                                     config.cell_size.0,
+//                                     config.cell_size.1,
+//                                 )),
+//                                 ..default()
+//                             },
+//                             transform: Transform::from_translation(tail_position),
+//                             ..default()
+//                         },
+//                     };
+//                     let new_tail = commands.spawn(new_cell).insert(Tail).id();
+//                     commands.entity(snek.0).push_children(&[new_tail]);
+//                     commands.entity(tail.4).remove::<Tail>();
+//                     snek.1.spawners.remove(point_index);
+//                 }
+//             }
+//         }
+//     }
+// }
