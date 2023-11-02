@@ -121,15 +121,15 @@ bevy-tokio-tasks = "0.11.0"
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.release]
+[profile.android-release]
 lto = 'thin'
-opt-level = 3
+opt-level = 'z'
 codegen-units = 1
 strip = true
 
-[profile.web-release]
+[profile.release]
 inherits = "release"
-opt-level = "z"
+opt-level = 3
 
 
 [[package.metadata.android.uses_permission]]
