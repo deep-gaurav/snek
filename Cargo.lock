@@ -216,19 +216,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-compat"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f68a707c1feb095d8c07f8a65b9f506b117d30af431cab89374357de7c11461b"
-dependencies = [
- "futures-core",
- "futures-io",
- "once_cell",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
 name = "async-executor"
 version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3412,7 +3399,6 @@ name = "snek"
 version = "0.1.0"
 dependencies = [
  "async-channel",
- "async-compat",
  "bevy",
  "bevy-tokio-tasks",
  "bevy_rapier2d",
@@ -4328,9 +4314,9 @@ dependencies = [
 
 [[package]]
 name = "wtransport"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c14e2f72e73898b8369710f9ab04b52671ecd5c234453594e5e25838a91bccc3"
+checksum = "94ea9ac45a4993e939a619b74eae332c39af0c984eb6db16d38951e0f19a822e"
 dependencies = [
  "bytes",
  "quinn",
@@ -4347,9 +4333,9 @@ dependencies = [
 
 [[package]]
 name = "wtransport-proto"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79dd49f3326280fb4b7a09638d563d84ea7ad225eb5324e91a0db7169caa94a3"
+checksum = "d23957f0cc9d7e4de1c93e49a0704c3242f22852ff81550fe26167cefc7974e7"
 dependencies = [
  "ls-qpack",
  "octets",

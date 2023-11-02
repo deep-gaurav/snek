@@ -163,8 +163,9 @@ pub fn connect_transport(
             runtime.spawn_background_task(|_ctx| async move {
 
                 use wtransport::ClientConfig;
-                let config = ClientConfig::default();
+                let config = ClientConfig::builder().with_bind_default().with_no_cert_validation().build();
                 let endpoint = wtransport::Endpoint::client(config).unwrap();
+                println!("Got endpoint");
                 send_receive_background(room_id_c, endpoint, receiver_tx, sender_rx).await
             });
 
@@ -195,74 +196,77 @@ async fn send_receive_background(
         } else {
         }
     }
+
     let connection = endpoint
         .connect(&format!(
             "https://web-room-relay.deepwith.in:4433/room/{room_id_c}",
         ))
         .await;
-    if let Ok(connection) = connection {
-        cfg_if::cfg_if! {
-            if #[cfg(target_family = "wasm")] {
-                let Ok(connection) = connection.wait_connect().await else{
-                    return;
-                };
-            } else {
+    match connection {
+        Ok(connection) => {
+            cfg_if::cfg_if! {
+                if #[cfg(target_family = "wasm")] {
+                    let Ok(connection) = connection.wait_connect().await else{
+                        return;
+                    };
+                } else {
+                }
             }
-        }
-        if let Err(err) = receiver_tx.send(ReceiveMessage::ConnectionEstablished) {
-            warn!("Failed to send rcv {err:?}")
-        }
-        let mut send_msg_fut = None;
-        loop {
-            let send_msg_fut_local = send_msg_fut.take();
-            let resp = futures::future::select(
-                sender_rx.recv_async(),
-                match send_msg_fut_local {
-                    Some(val) => val,
-                    None => Box::pin(connection.receive_datagram()),
-                },
-            )
-            .await;
+            if let Err(err) = receiver_tx.send(ReceiveMessage::ConnectionEstablished) {
+                warn!("Failed to send rcv {err:?}")
+            }
+            let mut send_msg_fut = None;
+            loop {
+                let send_msg_fut_local = send_msg_fut.take();
+                let resp = futures::future::select(
+                    sender_rx.recv_async(),
+                    match send_msg_fut_local {
+                        Some(val) => val,
+                        None => Box::pin(connection.receive_datagram()),
+                    },
+                )
+                .await;
 
-            match resp {
-                futures::future::Either::Left((send_msg, data_gram_fut)) => {
-                    send_msg_fut = Some(data_gram_fut);
-                    if let Ok(msg) = send_msg {
-                        if let SendMessage::TransportMessage(msg) = msg {
-                            let bin = bincode::serialize(&msg)
-                                    .ok()
-                                    // .and_then(|val| zstd::encode_all(val, 0).ok())
-                                    ;
-                            if let Some(bin) = bin {
-                                use xwebtransport_core::datagram::Send;
-                                cfg_if::cfg_if! {
-                                    if #[cfg(target_family = "wasm")] {
-                                        connection.send_datagram(&bin).await;
+                match resp {
+                    futures::future::Either::Left((send_msg, data_gram_fut)) => {
+                        send_msg_fut = Some(data_gram_fut);
+                        if let Ok(msg) = send_msg {
+                            if let SendMessage::TransportMessage(msg) = msg {
+                                let bin = bincode::serialize(&msg)
+                                        .ok()
+                                        // .and_then(|val| zstd::encode_all(val, 0).ok())
+                                        ;
+                                if let Some(bin) = bin {
+                                    use xwebtransport_core::datagram::Send;
+                                    cfg_if::cfg_if! {
+                                        if #[cfg(target_family = "wasm")] {
+                                            connection.send_datagram(&bin).await;
 
-                                    } else {
-                                        connection.send_datagram(&bin);
+                                        } else {
+                                            connection.send_datagram(&bin);
 
+                                        }
                                     }
                                 }
                             }
+                        } else {
+                            break;
                         }
-                    }else{
-                        break;
                     }
-                }
-                futures::future::Either::Right((datagram, send_msg_fut)) => {
-                    let res = match datagram {
-                        Ok(datagram) => {
-                            receiver_tx.send(ReceiveMessage::DatagramReceived(datagram.to_vec()))
+                    futures::future::Either::Right((datagram, send_msg_fut)) => {
+                        let res = match datagram {
+                            Ok(datagram) => receiver_tx
+                                .send(ReceiveMessage::DatagramReceived(datagram.to_vec())),
+                            Err(err) => receiver_tx.send(ReceiveMessage::ConnectionError),
+                        };
+                        if let Err(err) = res {
+                            warn!("{err:?}")
                         }
-                        Err(err) => receiver_tx.send(ReceiveMessage::ConnectionError),
-                    };
-                    if let Err(err) = res {
-                        warn!("{err:?}")
                     }
                 }
             }
         }
+        Err(err) => eprintln!("Connection failed {err:#?}"),
     }
 }
 
