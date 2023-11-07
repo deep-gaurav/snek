@@ -255,8 +255,20 @@ pub fn main() {
     #[cfg(not(target_family = "wasm"))]
     setup_tokio(&mut app);
 
+    #[cfg(target_family = "wasm")]
+    remove_wasm_loader();
+
     app.run()
 }
+
+#[cfg(target_family = "wasm")]
+fn remove_wasm_loader(){
+ if let Ok(Some(element)) = web_sys::window().unwrap().document().unwrap().query_selector(".spinner-container"){
+    element.remove();
+ }
+}
+
+
 #[cfg(debug_assertions)]
 fn debug_plugins(app: &mut App) {
     // use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};

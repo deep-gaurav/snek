@@ -28,12 +28,99 @@
             width: 100%;
             height: 100%;
         }
+
+        .spinner-container {
+            background-color: #666666;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 20px);
+            grid-template-rows: repeat(4, 20px);
+            gap: 1px;
+          }
+    
+          .grid-cell {
+            width: 100%;
+            height: 100%;
+            background-color: #dddddd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+          }
+    
+          .highlighted {
+            background-color: rgb(187, 0, 0);
+          }
     </style>
     <link data-trunk rel="rust" href="Cargo.toml" data-wasm-opt="z" data-bin="snek" />
     <link data-trunk rel="copy-dir" href="assets" />
 </head>
 
 <body>
+    <div class="spinner-container">
+        <div class="grid-container">
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+            <div class="grid-cell"></div>
+        </div>
+        <script>
+            const mod = function (n1, n2) {
+              return ((n1 % n2) + n2) % n2;
+            };
+            const cells = document.querySelectorAll(".grid-cell");
+            function highlightCells(indexes) {
+              cells.forEach((cell, i) => {
+                cell.classList.toggle("highlighted", indexes.includes(i));
+              });
+            }
+      
+            let headIndex = 0;
+            function highlightEdgeCells() {
+              if(cells.length<=0){
+                return;
+              } 
+              const edgeIndexes = [0, 1, 2, 3, 7, 11, 15, 14, 13, 12, 8, 4];
+              t3 = mod(headIndex + 1 - 3, edgeIndexes.length);
+              t2 = mod(headIndex + 1 - 2, edgeIndexes.length);
+              t1 = mod(headIndex + 1 - 1, edgeIndexes.length);
+      
+              headIndex = mod(headIndex + 1, edgeIndexes.length);
+      
+              highlightCells([
+                edgeIndexes[headIndex],
+                edgeIndexes[t1],
+                edgeIndexes[t2],
+                edgeIndexes[t3]
+              ]);
+              setTimeout(highlightEdgeCells, 600); // Repeat after all cells are highlighted
+            }
+      
+            highlightEdgeCells();
+        </script>
+    </div>
     <div class="game-container">
         <canvas id="main_canvas"></canvas>
     </div>
