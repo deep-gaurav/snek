@@ -1,5 +1,7 @@
 # Snek with Friends
 
+[Play in Browser](https://snek.deepwith.in)
+
 Simple multiplayer snake game built with Bevy, WebTransport which runs on both web and natively.
 
 ![snek](https://github.com/deep-gaurav/snek/assets/28472450/6bb5fd32-8ebc-4781-abed-7bf3b5b47dac)
