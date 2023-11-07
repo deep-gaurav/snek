@@ -288,6 +288,7 @@ fn setup(
                 ..Default::default()
             },
             transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+            visibility: Visibility::Hidden,
             ..default()
         },
         FoodPointer,

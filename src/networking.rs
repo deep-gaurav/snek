@@ -144,7 +144,7 @@ pub fn connect_transport(
     cfg_if::cfg_if! {
         if #[cfg(target_family = "wasm")] {
 
-                let task = thread_pool
+                let task = _thread_pool
         .spawn(async move {
 
             send_receive_background(room_id_c, receiver_tx, sender_rx).await
@@ -186,6 +186,7 @@ async fn send_receive_background(
             let endpoint = xwebtransport::current::Endpoint {
                 ..Default::default()
             };
+            use xwebtransport_core::traits::EndpointConnect;
         } else {
         }
     }
@@ -199,6 +200,8 @@ async fn send_receive_background(
         Ok(connection) => {
             cfg_if::cfg_if! {
                 if #[cfg(target_family = "wasm")] {
+                    use xwebtransport_core::Connecting;
+                    use xwebtransport_core::datagram::Receive;
                     let Ok(connection) = connection.wait_connect().await else{
                         return;
                     };
@@ -233,6 +236,7 @@ async fn send_receive_background(
                             if let Some(bin) = bin {
                                 cfg_if::cfg_if! {
                                     if #[cfg(target_family = "wasm")] {
+                                        use xwebtransport_core::datagram::Send;
                                         connection.send_datagram(&bin).await;
                                     } else {
                                         if let Err(err) = connection.send_datagram(&bin) {
