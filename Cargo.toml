@@ -143,7 +143,3 @@ assets = "assets"
 # This strips debug symbols from the shared libraries, drastically reducing APK size. If you need them, remove the option.
 strip = "strip"
 # build_targets = ["aarch64-linux-android", "armv7-linux-androideabi"]
-
-[package.metadata.android.signing.release]
-path = "/Users/deep/release_keystore"
-keystore_password = "Deep@gaurav1"
