@@ -20,7 +20,6 @@ pub fn spawn_food_system(
     if host.is_empty() {
         return;
     }
-    let pad = 20;
     if food_query.is_empty() {
         let (pos_x, pos_y) = {
             let rad = rand::random::<f32>() * 900.0;
@@ -30,12 +29,14 @@ pub fn spawn_food_system(
         };
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
             let food_id = rand::random();
-            connection
+            if let Err(err) = connection
                 .sender
                 .send(SendMessage::TransportMessage(TransportMessage::SpawnFood(
                     food_id,
                     Vec2 { x: pos_x, y: pos_y },
-                )));
+                ))) {
+                    warn!("{err:?}")
+                }
             commands.spawn(spawn_food(food_id, config.cell_size, pos_x, pos_y));
         }
     }
@@ -66,10 +67,9 @@ pub fn handle_food_collision(
     mut collision_events: EventReader<CollisionEvent>,
     head_sensor: Query<(Entity, &HeadSensor, &Parent)>,
     food: Query<(Entity, &Food)>,
-    head_cell: Query<(&Parent, &Transform, &crate::Direction)>,
-    body_cell: Query<(Entity), With<CellTag>>,
+    body_cell: Query<Entity, With<CellTag>>,
     // mut snek: Query<&mut Spawner>,
-    mut snek: Query<(Entity, &SnakeTag)>,
+    snek: Query<(Entity, &SnakeTag)>,
     mut commands: Commands,
     connection_handler: Res<ConnectionState>,
     snek_main: Query<(Entity, &SnakeTag)>,
@@ -86,10 +86,8 @@ pub fn handle_food_collision(
             let head = head_sensor.get(*object).or(head_sensor.get(*collider));
             let cell = body_cell.get(*collider);
             // info!("Collision food: {:?} head: {:?} cell {:?} object:{object:?}, collider: {collider:?} flags:{_flags:?}\nheads:{heads:?}\nfoods:{foods:?}", food, head, cell);
-            if let (Ok(head), Ok(food)) = (head, food) {
+            if let (Ok(_head), Ok(food)) = (head, food) {
                 commands.entity(food.0).despawn_recursive();
-                let headcell = head_cell.get(head.2.get());
-                if let Ok(headcell) = headcell {
                     let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
                     let snek = snek.iter().find(|p| p.1 == &SnakeTag::SelfPlayerSnake);
                     if let Some(snek) = snek {
@@ -148,15 +146,17 @@ pub fn handle_food_collision(
                                 }
                             }
                         }
-                    }
+                    
                 }
             } else if let (Ok(_head), Ok(_cell)) = (head, cell) {
                 if let Some(snek) = snek_main.iter().find(|s| s.1 == &SnakeTag::SelfPlayerSnake) {
                     snake_kill_writer.send(KillSnake { snake_id: snek.0 });
                     if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-                        connection
+                       if let Err(err)=  connection
                             .sender
-                            .send(SendMessage::TransportMessage(TransportMessage::KillSnake));
+                            .send(SendMessage::TransportMessage(TransportMessage::KillSnake)){
+                                warn!("{err:?}")
+                            }
                     }
                 }
             }
@@ -190,7 +190,7 @@ pub fn sync_food_pointer(
         return;
     };
     let rect = (window.width(), window.height());
-    let (Some(top_left), Some(top_right), Some(bottom_left), Some(bottom_right)) = (
+    let (Some(top_left), Some(_top_right), Some(bottom_left), Some(bottom_right)) = (
         camera.viewport_to_world_2d(camera_transform, Vec2 { x: 0., y: 0. }),
         camera.viewport_to_world_2d(camera_transform, Vec2 { x: rect.0, y: 0. }),
         camera.viewport_to_world_2d(camera_transform, Vec2 { x: 0., y: rect.1 }),

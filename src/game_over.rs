@@ -31,9 +31,11 @@ pub fn check_snek_position(
             if let Some(snek) = snek_head.iter().find(|p| p.1 == &SnakeTag::SelfPlayerSnake) {
                 kill_write.send(KillSnake { snake_id: snek.0 });
                 if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-                    connection
+                    if let Err(err) = connection
                         .sender
-                        .send(SendMessage::TransportMessage(TransportMessage::KillSnake));
+                        .send(SendMessage::TransportMessage(TransportMessage::KillSnake)){
+                            warn!("{err:?}")
+                        }
                 }
             }
         }

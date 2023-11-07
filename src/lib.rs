@@ -9,13 +9,12 @@ pub mod window;
 pub mod scoring;
 
 use bevy::{
-    input::touch::TouchPhase,
     prelude::*,
     render::render_resource::{AddressMode, SamplerDescriptor},
     sprite::Material2dPlugin,
     window::WindowResolution,
 };
-use bevy_rapier2d::{na::ComplexField, prelude::*};
+use bevy_rapier2d::prelude::*;
 use food::{handle_food_collision, spawn_food_system, sync_food_pointer, FoodPointer};
 use game_over::{check_snek_position, handle_kill_snake, respawn_menu_system, respawn_handle_button};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};

@@ -19,7 +19,7 @@ pub struct StartButton;
 
 pub fn setup_lobby_menu(mut commands: Commands, connection_handler: Res<ConnectionState>) {
     if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-        let button_entity = commands
+         commands
             .spawn((
                 LobbyMainNode,
                 NodeBundle {
@@ -82,16 +82,14 @@ pub fn setup_lobby_menu(mut commands: Commands, connection_handler: Res<Connecti
                             ..Default::default()
                         });
                     });
-            })
-            .id();
+            });
     }
 }
 
 pub fn update_player_details(
-    player_nodes: Query<(Entity, &PlayerNode)>,
     lobby_query: Query<Entity, With<LobbyMainNode>>,
     players_node: Query<(Entity, &PlayersNode)>,
-    game_button: Query<(Entity), With<StartButton>>,
+    game_button: Query<Entity, With<StartButton>>,
     host: Query<Entity, With<Host>>,
     mut players_changed: EventReader<PlayersChanged>,
     mut commands: Commands,
@@ -180,18 +178,20 @@ pub fn update_player_details(
 pub fn lobby_handle_button(
     mut next_state: ResMut<NextState<GameStates>>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<StartButton>)>,
-    mut connection_handler: ResMut<ConnectionState>,
+    connection_handler: ResMut<ConnectionState>,
     time: Res<Time>,
 ) {
     for interaction in &interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-                    connection
+                    if let Err(err) = connection
                         .sender
                         .send(crate::networking::SendMessage::TransportMessage(
                             crate::networking::TransportMessage::StartGame(time.elapsed_seconds()),
-                        ));
+                        )) {
+                            warn!("{err:?}")
+                        }
                     next_state.set(GameStates::GamePlay);
                 }
             }
