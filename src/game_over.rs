@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     networking::{ConnectionState, SendMessage, TransportMessage},
     snek::{KillSnake, SpawnSnake},
-    HeadSensor, SnakeTag, Head,
+    Head, HeadSensor, SnakeTag,
 };
 
 pub fn handle_kill_snake(
@@ -33,9 +33,10 @@ pub fn check_snek_position(
                 if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
                     if let Err(err) = connection
                         .sender
-                        .send(SendMessage::TransportMessage(TransportMessage::KillSnake)){
-                            warn!("{err:?}")
-                        }
+                        .send(SendMessage::TransportMessage(TransportMessage::KillSnake))
+                    {
+                        warn!("{err:?}")
+                    }
                 }
             }
         }
@@ -48,11 +49,15 @@ pub struct GameOvermenu;
 #[derive(Component)]
 pub struct RespawnButton;
 
-pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, head: Query<&Head>, mut commands: Commands, connection_handler: Res<ConnectionState>){
-
+pub fn respawn_menu_system(
+    game_over_menu: Query<Entity, With<GameOvermenu>>,
+    head: Query<&Head>,
+    mut commands: Commands,
+    connection_handler: Res<ConnectionState>,
+) {
     if head.is_empty() && game_over_menu.is_empty() {
         info!("You died");
-          commands
+        commands
             .spawn((
                 GameOvermenu,
                 NodeBundle {
@@ -65,7 +70,7 @@ pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, he
                         justify_content: JustifyContent::SpaceEvenly,
                         align_items: AlignItems::Center,
                         column_gap: Val::Px(10.),
-                        
+
                         ..default()
                     },
                     background_color: Color::rgba(0.2, 0.2, 0.2, 0.7).into(),
@@ -81,9 +86,11 @@ pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, he
                         ..default()
                     },
                 ));
-                if let ConnectionState::Connected(conenction) = connection_handler.as_ref(){
-                    if let Some(player_id) = conenction.self_id{
-                        if let Some(player) = conenction.players.iter().find(|p|p.user_id==player_id){
+                if let ConnectionState::Connected(conenction) = connection_handler.as_ref() {
+                    if let Some(player_id) = conenction.self_id {
+                        if let Some(player) =
+                            conenction.players.iter().find(|p| p.user_id == player_id)
+                        {
                             parent.spawn(TextBundle::from_section(
                                 format!("Score: {}", player.score),
                                 TextStyle {
@@ -93,9 +100,9 @@ pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, he
                                 },
                             ));
                             parent.spawn(TextBundle::from_section(
-                                if player.score==player.highest_score {
+                                if player.score == player.highest_score {
                                     format!("Your Highest Score!!")
-                                }else{
+                                } else {
                                     format!("Your Highest Score: {}", player.highest_score)
                                 },
                                 TextStyle {
@@ -107,35 +114,35 @@ pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, he
                         }
                     }
                 }
-                parent.spawn((
-                    RespawnButton,
-                    ButtonBundle {
-                        style: Style {
-                            height: Val::Px(65.),
-                            // horizontally center child text
-                            justify_content: JustifyContent::Center,
-                            // vertically center child text
-                            align_items: AlignItems::Center,
+                parent
+                    .spawn((
+                        RespawnButton,
+                        ButtonBundle {
+                            style: Style {
+                                height: Val::Px(65.),
+                                // horizontally center child text
+                                justify_content: JustifyContent::Center,
+                                // vertically center child text
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            background_color: Color::rgb(0.15, 0.15, 0.15).into(),
                             ..default()
                         },
-                        background_color: Color::rgb(0.15, 0.15, 0.15).into(),
-                        ..default()
-                    },
-                ))
-                .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "Respawn",
-                        TextStyle {
-                            font_size: 40.0,
-                            color: Color::rgb(0.9, 0.9, 0.9),
-                            ..default()
-                        },
-                    ));
-                });
+                    ))
+                    .with_children(|parent| {
+                        parent.spawn(TextBundle::from_section(
+                            "Respawn",
+                            TextStyle {
+                                font_size: 40.0,
+                                color: Color::rgb(0.9, 0.9, 0.9),
+                                ..default()
+                            },
+                        ));
+                    });
             });
-    }
-    else if !head.is_empty() && !game_over_menu.is_empty() {
-        if let Ok(entity) = game_over_menu.get_single(){
+    } else if !head.is_empty() && !game_over_menu.is_empty() {
+        if let Ok(entity) = game_over_menu.get_single() {
             commands.entity(entity).despawn_recursive();
         }
     }
@@ -143,7 +150,7 @@ pub fn respawn_menu_system(game_over_menu: Query<Entity, With<GameOvermenu>>, he
 
 pub fn respawn_handle_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<RespawnButton>)>,
-    mut spawn_snek_writer: EventWriter<SpawnSnake>
+    mut spawn_snek_writer: EventWriter<SpawnSnake>,
 ) {
     for interaction in &interaction_query {
         match *interaction {

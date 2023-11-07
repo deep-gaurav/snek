@@ -70,19 +70,16 @@ pub fn display_scores(
 ) {
     if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
         for player in connection.players.iter() {
-            let scoretxt = if player.score==player.highest_score {
+            let scoretxt = if player.score == player.highest_score {
                 player.score.to_string()
-            }else {
+            } else {
                 format!("{} ({})", player.score, player.highest_score)
             };
             let score_text = q_score_text.iter_mut().find(|p| p.1 .0 == player.user_id);
             if let Some(mut text) = score_text {
                 if let Some(section) = text.0.sections.first() {
                     if section.value != scoretxt {
-                        let new_section = TextSection::new(
-                            scoretxt,
-                            section.style.clone(),
-                        );
+                        let new_section = TextSection::new(scoretxt, section.style.clone());
                         text.0.sections = vec![new_section];
                     }
                 }
@@ -105,26 +102,24 @@ pub fn display_scores(
                                 },
                             ))
                             .with_children(|parent| {
-                                parent.spawn(
-                                    NodeBundle{
-                                        border_color: BorderColor::DEFAULT,
-                                        background_color: player.color.into(),
-                                        style: Style{
-                                            width: Val::Px(20.),
-                                            border: UiRect::all(Val::Px(
-                                                if Some(player.user_id)== connection.self_id {
-                                                    1.
-                                                } else{
-                                                    0.
-                                                }
-                                            )),
-                                            height: Val::Px(20.),
-                                            margin: UiRect::right(Val::Px(5.)),
-                                            ..Default::default()
-                                        },
+                                parent.spawn(NodeBundle {
+                                    border_color: BorderColor::DEFAULT,
+                                    background_color: player.color.into(),
+                                    style: Style {
+                                        width: Val::Px(20.),
+                                        border: UiRect::all(Val::Px(
+                                            if Some(player.user_id) == connection.self_id {
+                                                1.
+                                            } else {
+                                                0.
+                                            },
+                                        )),
+                                        height: Val::Px(20.),
+                                        margin: UiRect::right(Val::Px(5.)),
                                         ..Default::default()
-                                    }
-                                );
+                                    },
+                                    ..Default::default()
+                                });
                                 parent.spawn((
                                     ScoreText(player.user_id),
                                     TextBundle::from_section(

@@ -1,7 +1,3 @@
-// pub fn connect
-
-use std::default;
-
 use bevy::{
     prelude::*,
     sprite::Sprite,
@@ -10,10 +6,8 @@ use bevy::{
 };
 use bevy_rapier2d::prelude::{Collider, Sensor};
 use flume::{Receiver, Sender};
-use futures::task::Spawn;
+
 use serde::{Deserialize, Serialize};
-use xwebtransport::current::Connection;
-use xwebtransport_core::{datagram::Receive, AcceptUniStream, Connecting, EndpointConnect};
 
 #[cfg(not(target_family = "wasm"))]
 use bevy_tokio_tasks::TokioTasksRuntime;
@@ -22,7 +16,7 @@ use crate::{
     food::{spawn_food, Food},
     snek::KillSnake,
     CellTag, Direction, GameConfig, GameStates, Host, LastMoveId, Move, MoveId, Moves, Snake,
-    SnakeCell, SnakeTag, SpawnDetail,
+    SnakeCell, SnakeTag,
 };
 
 pub enum SendMessage {
@@ -126,7 +120,6 @@ pub struct SnakeUpdate {
 
 #[derive(Event)]
 pub struct AddMove {
-    update_time: PointInTime,
     user_id: u32,
     _move: Move,
 }
@@ -141,7 +134,7 @@ pub fn connect_transport(
 ) {
     println!("Connect called");
 
-    let thread_pool = AsyncComputeTaskPool::get();
+    let _thread_pool = AsyncComputeTaskPool::get();
 
     let (sender_tx, sender_rx) = flume::unbounded();
     let (receiver_tx, receiver_rx) = flume::unbounded();
@@ -231,20 +224,19 @@ async fn send_receive_background(
                     futures::future::Either::Left((send_msg, data_gram_fut)) => {
                         send_msg_fut = Some(data_gram_fut);
                         if let Ok(msg) = send_msg {
-                            if let SendMessage::TransportMessage(msg) = msg {
-                                let bin = bincode::serialize(&msg)
-                                        .ok()
-                                        // .and_then(|val| zstd::encode_all(val, 0).ok())
-                                        ;
-                                if let Some(bin) = bin {
-                                    use xwebtransport_core::datagram::Send;
-                                    cfg_if::cfg_if! {
-                                        if #[cfg(target_family = "wasm")] {
-                                            connection.send_datagram(&bin).await;
+                            let SendMessage::TransportMessage(msg) = msg;
 
-                                        } else {
-                                            connection.send_datagram(&bin);
-
+                            let bin = bincode::serialize(&msg)
+                                    .ok()
+                                    // .and_then(|val| zstd::encode_all(val, 0).ok())
+                                    ;
+                            if let Some(bin) = bin {
+                                cfg_if::cfg_if! {
+                                    if #[cfg(target_family = "wasm")] {
+                                        connection.send_datagram(&bin).await;
+                                    } else {
+                                        if let Err(err) = connection.send_datagram(&bin) {
+                                            warn!("{err:?}")
                                         }
                                     }
                                 }
@@ -253,11 +245,11 @@ async fn send_receive_background(
                             break;
                         }
                     }
-                    futures::future::Either::Right((datagram, send_msg_fut)) => {
+                    futures::future::Either::Right((datagram, _send_msg_fut)) => {
                         let res = match datagram {
                             Ok(datagram) => receiver_tx
                                 .send(ReceiveMessage::DatagramReceived(datagram.to_vec())),
-                            Err(err) => receiver_tx.send(ReceiveMessage::ConnectionError),
+                            Err(_err) => receiver_tx.send(ReceiveMessage::ConnectionError),
                         };
                         if let Err(err) = res {
                             warn!("{err:?}")
@@ -274,11 +266,11 @@ pub fn receive_msgs(
     config: Res<GameConfig>,
     mut connection_handler: ResMut<ConnectionState>,
     mut next_state: ResMut<NextState<GameStates>>,
-    current_state: Res<State<GameStates>>,
+    _current_state: Res<State<GameStates>>,
     mut snake_update: EventWriter<SnakeUpdate>,
     mut add_move: EventWriter<AddMove>,
     mut players_changed_ev: EventWriter<PlayersChanged>,
-    mut host: Query<Entity, With<Host>>,
+    host: Query<Entity, With<Host>>,
     food: Query<(Entity, &Food)>,
     mut commands: Commands,
     time: Res<Time>,
@@ -300,9 +292,12 @@ pub fn receive_msgs(
                         if let Ok(msg) = msg {
                             match msg {
                                 RelayMessage::RoomJoined(user_id, users) => {
-                                    connection.sender.send(SendMessage::TransportMessage(
-                                        TransportMessage::Noop,
-                                    ));
+                                    if let Err(err) = connection
+                                        .sender
+                                        .send(SendMessage::TransportMessage(TransportMessage::Noop))
+                                    {
+                                        warn!("{err:?}")
+                                    }
                                     info!("Joined room with id {}", user_id);
                                     connection.self_id = Some(user_id);
                                     if connection.players.is_empty() {
@@ -359,7 +354,7 @@ pub fn receive_msgs(
                                         }
                                     }
                                 }
-                                RelayMessage::UserConnected(id, users) => {
+                                RelayMessage::UserConnected(id, _users) => {
                                     info!("User connected {id}");
                                     let color = Color::Hsla {
                                         hue: seeded_random::Random::from_seed(
@@ -411,11 +406,13 @@ pub fn receive_msgs(
                                         match transport_msg {
                                             TransportMessage::Noop => {}
                                             TransportMessage::Ping(t) => {
-                                                connection.sender.send(
+                                                if let Err(err) = connection.sender.send(
                                                     SendMessage::TransportMessage(
                                                         TransportMessage::Pong(t),
                                                     ),
-                                                );
+                                                ) {
+                                                    warn!("{err:?}")
+                                                }
                                             }
                                             TransportMessage::Pong(t) => {
                                                 info!("Ping {}", time.elapsed_seconds() - t);
@@ -441,11 +438,7 @@ pub fn receive_msgs(
                                                 if let Some(player) = player {
                                                     player.last_update_time = Some(update_time);
                                                 };
-                                                add_move.send(AddMove {
-                                                    user_id,
-                                                    _move,
-                                                    update_time,
-                                                })
+                                                add_move.send(AddMove { user_id, _move })
                                             }
 
                                             // TransportMessage::InformPlayers(players) => {
@@ -454,7 +447,7 @@ pub fn receive_msgs(
                                             //         commands.entity(host).despawn();
                                             //     }
                                             // }
-                                            TransportMessage::StartGame(start_time) => {
+                                            TransportMessage::StartGame(_start_time) => {
                                                 next_state.set(GameStates::GamePlay);
                                             }
                                             TransportMessage::SpawnFood(food_id, food_pos) => {
@@ -502,16 +495,19 @@ pub fn ping_send(
     if ping_tick.timer.finished() {
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
             let t = time.elapsed_seconds();
-            connection
+            if let Err(err) = connection
                 .sender
-                .send(SendMessage::TransportMessage(TransportMessage::Ping(t)));
+                .send(SendMessage::TransportMessage(TransportMessage::Ping(t)))
+            {
+                warn!("{err:?}")
+            }
         }
     }
 }
 
 pub fn send_snake_send(
-    transforms: Query<(&Transform), Or<(With<SnakeTag>, With<CellTag>)>>,
-    moves: Query<(&Moves)>,
+    transforms: Query<&Transform, Or<(With<SnakeTag>, With<CellTag>)>>,
+    moves: Query<&Moves>,
     moveid_direc: Query<(&Direction, &MoveId, &CellTag)>,
     snake: Query<(Entity, &SnakeTag)>,
     snake_cells: Query<(&Parent, Entity), With<CellTag>>,
@@ -523,7 +519,7 @@ pub fn send_snake_send(
     if !spawner_tick.timer.finished() {
         return;
     }
-    let Some((self_snake, snake_tag)) =
+    let Some((self_snake, _snake_tag)) =
         snake.iter().find(|val| val.1 == &SnakeTag::SelfPlayerSnake)
     else {
         return;
@@ -539,7 +535,7 @@ pub fn send_snake_send(
     let snake_cells = snake_cells
         .iter()
         .filter(|cell| cell.0.get() == self_snake)
-        .map(|(par, cell)| {
+        .map(|(_par, cell)| {
             let transform = transforms.get(cell).unwrap();
             let (dir, move_id, tag) = moveid_direc.get(cell).unwrap();
             SnakeCellDetails {
@@ -594,7 +590,7 @@ pub fn update_snake(
         else {
             continue;
         };
-        if let Some(mut last_up) = player.last_update_time {
+        if let Some(last_up) = player.last_update_time {
             if event.update_time < last_up {
                 info!("Skipping late event");
                 continue;
@@ -606,7 +602,7 @@ pub fn update_snake(
         let snake = snake
             .iter_mut()
             .find(|snake| snake.1 == &SnakeTag::OtherPlayerSnake(event.user_id));
-        if let Some(mut snake) = snake {
+        if let Some(snake) = snake {
             *transmform.get_mut(snake.0).unwrap() = event.snake_details.transform;
             *moves.get_mut(snake.0).unwrap() = event.snake_details.moves.clone();
             for cell in event.snake_details.cells.iter() {
@@ -658,7 +654,7 @@ pub fn update_snake(
                 }
             }
         } else {
-            let snake = commands
+            let _snake = commands
                 .spawn((Snake {
                     tag: SnakeTag::OtherPlayerSnake(event.user_id),
                     spatial: SpatialBundle::from_transform(event.snake_details.transform),

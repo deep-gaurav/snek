@@ -71,8 +71,8 @@ pub fn terrain_tiler(
     config: Res<GameConfig>,
 ) {
     if let Some(head) = player_head.iter().next() {
-        let block_x = (head.translation.x as i32 / 100);
-        let block_y = (head.translation.y as i32 / 100);
+        let block_x = head.translation.x as i32 / 100;
+        let block_y = head.translation.y as i32 / 100;
         let horizontal = (config.game_size.0 as i32) / 200 + 3;
         let vertical = (config.game_size.1 as i32) / 200 + 3;
 

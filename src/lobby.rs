@@ -19,7 +19,7 @@ pub struct StartButton;
 
 pub fn setup_lobby_menu(mut commands: Commands, connection_handler: Res<ConnectionState>) {
     if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-         commands
+        commands
             .spawn((
                 LobbyMainNode,
                 NodeBundle {
@@ -185,13 +185,17 @@ pub fn lobby_handle_button(
         match *interaction {
             Interaction::Pressed => {
                 if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-                    if let Err(err) = connection
-                        .sender
-                        .send(crate::networking::SendMessage::TransportMessage(
-                            crate::networking::TransportMessage::StartGame(time.elapsed_seconds()),
-                        )) {
-                            warn!("{err:?}")
-                        }
+                    if let Err(err) =
+                        connection
+                            .sender
+                            .send(crate::networking::SendMessage::TransportMessage(
+                                crate::networking::TransportMessage::StartGame(
+                                    time.elapsed_seconds(),
+                                ),
+                            ))
+                    {
+                        warn!("{err:?}")
+                    }
                     next_state.set(GameStates::GamePlay);
                 }
             }

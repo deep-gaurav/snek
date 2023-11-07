@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 
 use crate::{
     networking::ConnectionState, CellTag, ChangeDirection, GameConfig, Head, HeadSensor,
-    LastMoveId, MainCamera, MoveId, Moves, Player, Snake, SnakeCell, SnakeTag,  Tail,
+    LastMoveId, MoveId, Moves, Player, Snake, SnakeCell, SnakeTag, Tail,
 };
 
 #[derive(Event)]
@@ -14,9 +14,7 @@ pub struct KillSnake {
 #[derive(Event)]
 pub struct SpawnSnake;
 
-pub fn setup_snek(
-    mut spawn_snek_writer: EventWriter<SpawnSnake>
-) {
+pub fn setup_snek(mut spawn_snek_writer: EventWriter<SpawnSnake>) {
     spawn_snek_writer.send(SpawnSnake);
 }
 
@@ -24,34 +22,33 @@ pub fn spawn_snek(
     config: Res<GameConfig>,
     mut commands: Commands,
     connection_handler: Res<ConnectionState>,
-    mut spawn_snek_reader: EventReader<SpawnSnake>
-){
-    for _event in spawn_snek_reader.iter(){
+    mut spawn_snek_reader: EventReader<SpawnSnake>,
+) {
+    for _event in spawn_snek_reader.iter() {
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-
             let Some(player_id) = connection.self_id else {
                 return;
             };
             let Some(player) = connection.players.iter().find(|p| p.user_id == player_id) else {
                 return;
             };
-        
+
             let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
             let cell_size = config.cell_size;
-        
-            let initial_position =  {
+
+            let initial_position = {
                 let rad = rand::random::<f32>() * 900.0;
                 let angle = rand::random::<f32>() * std::f32::consts::PI * 2.0;
-                let (sin,cos) = angle.sin_cos();
-                (rad*sin, rad*cos)
+                let (sin, cos) = angle.sin_cos();
+                (rad * sin, rad * cos)
             };
-        
+
             let player_snake = commands
                 .spawn((
                     Snake {
                         tag: SnakeTag::SelfPlayerSnake,
                         spatial: Default::default(),
-        
+
                         lastmove: LastMoveId(0),
                         moves: Moves { moves: vec![] },
                     },
@@ -99,16 +96,16 @@ pub fn spawn_snek(
                         ));
                 })
                 .id();
-        
+
             let cell2 = commands
                 .spawn((
                     SnakeCell {
                         cell_tag: CellTag(rand::random()),
-        
+
                         collider: Collider::cuboid(collider_size.0, collider_size.1),
                         sensor: Sensor,
                         direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
-        
+
                         sprite: SpriteBundle {
                             sprite: Sprite {
                                 color: player.color,
@@ -131,7 +128,7 @@ pub fn spawn_snek(
                 .spawn((
                     SnakeCell {
                         cell_tag: CellTag(rand::random()),
-        
+
                         collider: Collider::cuboid(collider_size.0, collider_size.1),
                         sensor: Sensor,
                         direction: crate::Direction(Vec2 { x: 1.0, y: 0.0 }),
@@ -156,9 +153,8 @@ pub fn spawn_snek(
             commands
                 .entity(player_snake)
                 .push_children(&[cell1, cell2, cell3]);
-            }
-        
-    }    
+        }
+    }
 }
 
 pub fn update_cell_direction(

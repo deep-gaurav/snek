@@ -3,10 +3,10 @@ pub mod game_over;
 pub mod lobby;
 pub mod menu;
 pub mod networking;
+pub mod scoring;
 pub mod snek;
 pub mod terrain;
 pub mod window;
-pub mod scoring;
 
 use bevy::{
     prelude::*,
@@ -16,17 +16,21 @@ use bevy::{
 };
 use bevy_rapier2d::prelude::*;
 use food::{handle_food_collision, spawn_food_system, sync_food_pointer, FoodPointer};
-use game_over::{check_snek_position, handle_kill_snake, respawn_menu_system, respawn_handle_button};
+use game_over::{
+    check_snek_position, handle_kill_snake, respawn_handle_button, respawn_menu_system,
+};
 use lobby::{clean_lobby, lobby_handle_button, setup_lobby_menu, update_player_details};
 use menu::{clean_entry_menu, entry_menu, setup_menu};
 use networking::{
-    ping_send, receive_msgs, send_snake_send, sync_add_move,  update_snake,
-    AddMove, ConnectionState, PingTimer, PlayersChanged, SendMessage, SnakeSyncTimer,
-    SnakeUpdate, TransportMessage,
+    ping_send, receive_msgs, send_snake_send, sync_add_move, update_snake, AddMove,
+    ConnectionState, PingTimer, PlayersChanged, SendMessage, SnakeSyncTimer, SnakeUpdate,
+    TransportMessage,
 };
-use scoring::{sync_scores, setup_score, display_scores};
+use scoring::{display_scores, setup_score, sync_scores};
 use serde::{Deserialize, Serialize};
-use snek::{setup_snek,  update_cell_direction, update_head_sensor, KillSnake, SpawnSnake, spawn_snek};
+use snek::{
+    setup_snek, spawn_snek, update_cell_direction, update_head_sensor, KillSnake, SpawnSnake,
+};
 use terrain::{setup_terrain, sync_cam, terrain_tiler, TerrainMaterial};
 use window::{get_height, get_width};
 
@@ -105,7 +109,7 @@ pub struct Head;
 #[derive(Component)]
 pub struct Tail;
 
-#[derive(Component,Debug)]
+#[derive(Component, Debug)]
 pub struct HeadSensor;
 
 #[derive(Event)]
@@ -193,7 +197,7 @@ pub fn main() {
     .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
     .add_systems(Startup, setup)
     .add_systems(OnEnter(GameStates::EntryMenu), setup_menu)
-    .add_systems(OnEnter(GameStates::GamePlay), (setup_snek,setup_score))
+    .add_systems(OnEnter(GameStates::GamePlay), (setup_snek, setup_score))
     .add_systems(OnExit(GameStates::EntryMenu), clean_entry_menu)
     .add_systems(Update, entry_menu.run_if(in_state(GameStates::EntryMenu)))
     .add_systems(OnEnter(GameStates::Lobby), setup_lobby_menu)
@@ -250,7 +254,7 @@ pub fn main() {
 
     #[cfg(not(target_family = "wasm"))]
     setup_tokio(&mut app);
-    
+
     app.run()
 }
 #[cfg(debug_assertions)]
@@ -265,7 +269,7 @@ fn debug_plugins(app: &mut App) {
 }
 
 #[cfg(not(target_family = "wasm"))]
-fn setup_tokio(app: &mut App){
+fn setup_tokio(app: &mut App) {
     app.add_plugins(bevy_tokio_tasks::TokioTasksPlugin::default());
 }
 

@@ -1,10 +1,8 @@
 use crate::networking::{connect_transport, ConnectionState};
-use crate::GameStates;
-use bevy::{prelude::*, tasks::AsyncComputeTaskPool};
+
+use bevy::prelude::*;
 
 use rand::Rng;
-use xwebtransport_core::datagram::Receive;
-use xwebtransport_core::{traits::EndpointConnect, AcceptBiStream, Connecting};
 
 #[cfg(not(target_family = "wasm"))]
 use bevy_tokio_tasks::TokioTasksRuntime;
@@ -33,7 +31,7 @@ pub struct RoomIdInputField;
 pub struct JoinRoomSubmitButton;
 
 pub fn setup_menu(mut commands: Commands) {
-    let button_entity = commands
+    let _button_entity = commands
         .spawn((
             EntryMenuNode,
             NodeBundle {
@@ -156,7 +154,7 @@ pub fn entry_menu(
     q_join_submit_button: Query<&JoinRoomSubmitButton>,
     mut room_input: Query<&mut Text, With<RoomIdInputField>>,
     asset_server: Res<AssetServer>,
-    #[cfg(not(target_family = "wasm"))] runtime: ResMut<TokioTasksRuntime>
+    #[cfg(not(target_family = "wasm"))] runtime: ResMut<TokioTasksRuntime>,
 ) {
     for interaction in &interaction_query {
         match *interaction.1 {
@@ -166,7 +164,12 @@ pub fn entry_menu(
                     let random_number: u32 = rng.gen_range(100_000..1_000_000);
                     let random_string = format!("{:06}", random_number);
 
-                    connect_transport(&random_string, connection_handler, #[cfg(not(target_family = "wasm"))] runtime);
+                    connect_transport(
+                        &random_string,
+                        connection_handler,
+                        #[cfg(not(target_family = "wasm"))]
+                        runtime,
+                    );
                     break;
                 } else if join_button.get(interaction.0).is_ok() {
                     for q in q_host_join_container.iter() {
@@ -188,7 +191,7 @@ pub fn entry_menu(
                             }
                         }
                     }
-                } else if let Ok(but) = q_back_button.get(interaction.0) {
+                } else if let Ok(_but) = q_back_button.get(interaction.0) {
                     if let Ok(mut input) = room_input.get_single_mut() {
                         if let Some(section) = input.sections.first() {
                             let mut chars = section.value.chars();
@@ -198,11 +201,16 @@ pub fn entry_menu(
                             input.sections = vec![new_section];
                         }
                     }
-                } else if let Ok(but) = q_join_submit_button.get(interaction.0) {
-                    if let Ok(mut input) = room_input.get_single_mut() {
+                } else if let Ok(_but) = q_join_submit_button.get(interaction.0) {
+                    if let Ok(input) = room_input.get_single_mut() {
                         if let Some(section) = input.sections.first() {
                             if section.value.len() == 6 {
-                                connect_transport(&section.value, connection_handler, #[cfg(not(target_family = "wasm"))] runtime);
+                                connect_transport(
+                                    &section.value,
+                                    connection_handler,
+                                    #[cfg(not(target_family = "wasm"))]
+                                    runtime,
+                                );
                                 break;
                             }
                         }

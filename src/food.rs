@@ -29,14 +29,16 @@ pub fn spawn_food_system(
         };
         if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
             let food_id = rand::random();
-            if let Err(err) = connection
-                .sender
-                .send(SendMessage::TransportMessage(TransportMessage::SpawnFood(
-                    food_id,
-                    Vec2 { x: pos_x, y: pos_y },
-                ))) {
-                    warn!("{err:?}")
-                }
+            if let Err(err) =
+                connection
+                    .sender
+                    .send(SendMessage::TransportMessage(TransportMessage::SpawnFood(
+                        food_id,
+                        Vec2 { x: pos_x, y: pos_y },
+                    )))
+            {
+                warn!("{err:?}")
+            }
             commands.spawn(spawn_food(food_id, config.cell_size, pos_x, pos_y));
         }
     }
@@ -88,75 +90,72 @@ pub fn handle_food_collision(
             // info!("Collision food: {:?} head: {:?} cell {:?} object:{object:?}, collider: {collider:?} flags:{_flags:?}\nheads:{heads:?}\nfoods:{foods:?}", food, head, cell);
             if let (Ok(_head), Ok(food)) = (head, food) {
                 commands.entity(food.0).despawn_recursive();
-                    let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
-                    let snek = snek.iter().find(|p| p.1 == &SnakeTag::SelfPlayerSnake);
-                    if let Some(snek) = snek {
-                        let tail = tail.iter().find(|tail| tail.0.get() == snek.0);
-                        if let Some(tail) = tail {
-                            if let ConnectionState::Connected(connection) =
-                                connection_handler.as_ref()
-                            {
-                                if let Some(player_id) = connection.self_id {
-                                    if let Some(player) =
-                                        connection.players.iter().find(|p| p.user_id == player_id)
-                                    {
-                                        let tail_position = tail.1.translation
-                                            - Vec3 {
-                                                x: tail.2 .0.x * config.cell_size.0,
-                                                y: tail.2 .0.y * config.cell_size.1,
-                                                z: 0.0,
-                                            };
-                                        let new_cell = SnakeCell {
-                                            cell_tag: CellTag(rand::random()),
+                let collider_size = (config.cell_size.0 / 2.0, config.cell_size.1 / 2.0);
+                let snek = snek.iter().find(|p| p.1 == &SnakeTag::SelfPlayerSnake);
+                if let Some(snek) = snek {
+                    let tail = tail.iter().find(|tail| tail.0.get() == snek.0);
+                    if let Some(tail) = tail {
+                        if let ConnectionState::Connected(connection) = connection_handler.as_ref()
+                        {
+                            if let Some(player_id) = connection.self_id {
+                                if let Some(player) =
+                                    connection.players.iter().find(|p| p.user_id == player_id)
+                                {
+                                    let tail_position = tail.1.translation
+                                        - Vec3 {
+                                            x: tail.2 .0.x * config.cell_size.0,
+                                            y: tail.2 .0.y * config.cell_size.1,
+                                            z: 0.0,
+                                        };
+                                    let new_cell = SnakeCell {
+                                        cell_tag: CellTag(rand::random()),
 
-                                            collider: Collider::cuboid(
-                                                collider_size.0,
-                                                collider_size.1,
-                                            ),
-                                            sensor: Sensor,
-                                            direction: crate::Direction(tail.2 .0),
-                                            move_id: MoveId(tail.3 .0),
-                                            sprite: SpriteBundle {
-                                                sprite: Sprite {
-                                                    color: player.color,
-                                                    custom_size: Some(Vec2::new(
-                                                        config.cell_size.0,
-                                                        config.cell_size.1,
-                                                    )),
-                                                    ..default()
-                                                },
-                                                transform: Transform::from_translation(
-                                                    tail_position,
-                                                ),
+                                        collider: Collider::cuboid(
+                                            collider_size.0,
+                                            collider_size.1,
+                                        ),
+                                        sensor: Sensor,
+                                        direction: crate::Direction(tail.2 .0),
+                                        move_id: MoveId(tail.3 .0),
+                                        sprite: SpriteBundle {
+                                            sprite: Sprite {
+                                                color: player.color,
+                                                custom_size: Some(Vec2::new(
+                                                    config.cell_size.0,
+                                                    config.cell_size.1,
+                                                )),
                                                 ..default()
                                             },
-                                        };
-                                        let new_tail = commands.spawn(new_cell).insert(Tail).id();
-                                        commands.entity(snek.0).push_children(&[new_tail]);
-                                        commands.entity(tail.4).remove::<Tail>();
-                                    }
+                                            transform: Transform::from_translation(tail_position),
+                                            ..default()
+                                        },
+                                    };
+                                    let new_tail = commands.spawn(new_cell).insert(Tail).id();
+                                    commands.entity(snek.0).push_children(&[new_tail]);
+                                    commands.entity(tail.4).remove::<Tail>();
+                                }
 
-                                    if let Err(err) =
-                                        connection.sender.send(SendMessage::TransportMessage(
-                                            TransportMessage::DespawnFood(food.1 .0),
-                                        ))
-                                    {
-                                        warn!("{err:?}")
-                                    }
+                                if let Err(err) =
+                                    connection.sender.send(SendMessage::TransportMessage(
+                                        TransportMessage::DespawnFood(food.1 .0),
+                                    ))
+                                {
+                                    warn!("{err:?}")
                                 }
                             }
                         }
-                    
+                    }
                 }
             } else if let (Ok(_head), Ok(_cell)) = (head, cell) {
                 if let Some(snek) = snek_main.iter().find(|s| s.1 == &SnakeTag::SelfPlayerSnake) {
                     snake_kill_writer.send(KillSnake { snake_id: snek.0 });
                     if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-                       if let Err(err)=  connection
+                        if let Err(err) = connection
                             .sender
-                            .send(SendMessage::TransportMessage(TransportMessage::KillSnake)){
-                                warn!("{err:?}")
-                            }
+                            .send(SendMessage::TransportMessage(TransportMessage::KillSnake))
+                        {
+                            warn!("{err:?}")
+                        }
                     }
                 }
             }
