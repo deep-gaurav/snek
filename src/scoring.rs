@@ -83,57 +83,55 @@ pub fn display_scores(
                         text.0.sections = vec![new_section];
                     }
                 }
-            } else {
-                if let Ok(scoreboard) = q_scoreboard.get_single() {
-                    commands.entity(scoreboard).with_children(|parent| {
-                        parent
-                            .spawn((
-                                ScoreContainer(player.user_id),
-                                NodeBundle {
-                                    style: Style {
-                                        flex_direction: FlexDirection::Row,
-                                        justify_content: JustifyContent::Center,
-                                        align_items: AlignItems::Center,
-                                        column_gap: Val::Px(10.),
-                                        row_gap: Val::Px(10.),
-                                        ..default()
-                                    },
+            } else if let Ok(scoreboard) = q_scoreboard.get_single() {
+                commands.entity(scoreboard).with_children(|parent| {
+                    parent
+                        .spawn((
+                            ScoreContainer(player.user_id),
+                            NodeBundle {
+                                style: Style {
+                                    flex_direction: FlexDirection::Row,
+                                    justify_content: JustifyContent::Center,
+                                    align_items: AlignItems::Center,
+                                    column_gap: Val::Px(10.),
+                                    row_gap: Val::Px(10.),
                                     ..default()
                                 },
-                            ))
-                            .with_children(|parent| {
-                                parent.spawn(NodeBundle {
-                                    border_color: BorderColor::DEFAULT,
-                                    background_color: player.color.into(),
-                                    style: Style {
-                                        width: Val::Px(20.),
-                                        border: UiRect::all(Val::Px(
-                                            if Some(player.user_id) == connection.self_id {
-                                                1.
-                                            } else {
-                                                0.
-                                            },
-                                        )),
-                                        height: Val::Px(20.),
-                                        margin: UiRect::right(Val::Px(5.)),
+                                ..default()
+                            },
+                        ))
+                        .with_children(|parent| {
+                            parent.spawn(NodeBundle {
+                                border_color: BorderColor::DEFAULT,
+                                background_color: player.color.into(),
+                                style: Style {
+                                    width: Val::Px(20.),
+                                    border: UiRect::all(Val::Px(
+                                        if Some(player.user_id) == connection.self_id {
+                                            1.
+                                        } else {
+                                            0.
+                                        },
+                                    )),
+                                    height: Val::Px(20.),
+                                    margin: UiRect::right(Val::Px(5.)),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            });
+                            parent.spawn((
+                                ScoreText(player.user_id),
+                                TextBundle::from_section(
+                                    scoretxt,
+                                    TextStyle {
+                                        font_size: 20.0,
+                                        color: Color::rgb(0.9, 0.9, 0.9),
                                         ..Default::default()
                                     },
-                                    ..Default::default()
-                                });
-                                parent.spawn((
-                                    ScoreText(player.user_id),
-                                    TextBundle::from_section(
-                                        scoretxt,
-                                        TextStyle {
-                                            font_size: 20.0,
-                                            color: Color::rgb(0.9, 0.9, 0.9),
-                                            ..Default::default()
-                                        },
-                                    ),
-                                ));
-                            });
-                    });
-                }
+                                ),
+                            ));
+                        });
+                });
             }
         }
     }

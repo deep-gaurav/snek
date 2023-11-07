@@ -132,7 +132,7 @@ pub fn sync_cam(
 ) {
     if let (Some(head), Some(camera)) = (head.iter().next(), camera.iter().next()) {
         if let Ok(head_trans) = transforms.get(head) {
-            let head_transform = head_trans.translation.clone();
+            let head_transform = head_trans.translation;
             if let Ok(mut cam_trans) = transforms.get_mut(camera) {
                 cam_trans.translation = head_transform;
             }

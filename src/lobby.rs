@@ -140,37 +140,35 @@ pub fn update_player_details(
             for button in game_button.iter() {
                 commands.entity(button).despawn_recursive();
             }
-        } else {
-            if game_button.is_empty() {
-                let id = commands
-                    .spawn((
-                        StartButton,
-                        ButtonBundle {
-                            style: Style {
-                                height: Val::Px(65.),
-                                // horizontally center child text
-                                justify_content: JustifyContent::Center,
-                                // vertically center child text
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            background_color: Color::rgb(0.15, 0.15, 0.15).into(),
+        } else if game_button.is_empty() {
+            let id = commands
+                .spawn((
+                    StartButton,
+                    ButtonBundle {
+                        style: Style {
+                            height: Val::Px(65.),
+                            // horizontally center child text
+                            justify_content: JustifyContent::Center,
+                            // vertically center child text
+                            align_items: AlignItems::Center,
                             ..default()
                         },
-                    ))
-                    .with_children(|parent| {
-                        parent.spawn(TextBundle::from_section(
-                            "Start Game",
-                            TextStyle {
-                                font_size: 40.0,
-                                color: Color::rgb(0.9, 0.9, 0.9),
-                                ..default()
-                            },
-                        ));
-                    })
-                    .id();
-                commands.entity(lobby_query.single()).add_child(id);
-            }
+                        background_color: Color::rgb(0.15, 0.15, 0.15).into(),
+                        ..default()
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn(TextBundle::from_section(
+                        "Start Game",
+                        TextStyle {
+                            font_size: 40.0,
+                            color: Color::rgb(0.9, 0.9, 0.9),
+                            ..default()
+                        },
+                    ));
+                })
+                .id();
+            commands.entity(lobby_query.single()).add_child(id);
         }
     }
 }
@@ -182,24 +180,19 @@ pub fn lobby_handle_button(
     time: Res<Time>,
 ) {
     for interaction in &interaction_query {
-        match *interaction {
-            Interaction::Pressed => {
-                if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
-                    if let Err(err) =
-                        connection
-                            .sender
-                            .send(crate::networking::SendMessage::TransportMessage(
-                                crate::networking::TransportMessage::StartGame(
-                                    time.elapsed_seconds(),
-                                ),
-                            ))
-                    {
-                        warn!("{err:?}")
-                    }
-                    next_state.set(GameStates::GamePlay);
+        if Interaction::Pressed == *interaction {
+            if let ConnectionState::Connected(connection) = connection_handler.as_ref() {
+                if let Err(err) =
+                    connection
+                        .sender
+                        .send(crate::networking::SendMessage::TransportMessage(
+                            crate::networking::TransportMessage::StartGame(time.elapsed_seconds()),
+                        ))
+                {
+                    warn!("{err:?}")
                 }
+                next_state.set(GameStates::GamePlay);
             }
-            _ => {}
         }
     }
 }

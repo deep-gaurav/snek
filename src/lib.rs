@@ -74,11 +74,11 @@ pub struct Player;
 #[derive(Component, Clone, Serialize, Deserialize)]
 pub struct Direction(Vec2);
 
-impl Into<Vec3> for Direction {
-    fn into(self) -> Vec3 {
+impl From<Direction> for Vec3 {
+    fn from(val: Direction) -> Self {
         Vec3 {
-            x: self.0.x,
-            y: self.0.y,
+            x: val.0.x,
+            y: val.0.y,
             z: 0.,
         }
     }

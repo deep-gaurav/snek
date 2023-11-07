@@ -101,7 +101,7 @@ pub fn respawn_menu_system(
                             ));
                             parent.spawn(TextBundle::from_section(
                                 if player.score == player.highest_score {
-                                    format!("Your Highest Score!!")
+                                    "Your Highest Score!!".to_string()
                                 } else {
                                     format!("Your Highest Score: {}", player.highest_score)
                                 },
@@ -153,12 +153,9 @@ pub fn respawn_handle_button(
     mut spawn_snek_writer: EventWriter<SpawnSnake>,
 ) {
     for interaction in &interaction_query {
-        match *interaction {
-            Interaction::Pressed => {
-                info!("Spawn pressed");
-                spawn_snek_writer.send(SpawnSnake);
-            }
-            _ => {}
+        if Interaction::Pressed == *interaction {
+            info!("Spawn pressed");
+            spawn_snek_writer.send(SpawnSnake);
         }
     }
 }

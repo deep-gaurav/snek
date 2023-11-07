@@ -384,7 +384,7 @@ pub fn receive_msgs(
                                     let p_index =
                                         connection.players.iter().position(|p| p.user_id == id);
 
-                                    if connection.self_id == users.iter().next().cloned()
+                                    if connection.self_id == users.first().cloned()
                                         && host.is_empty()
                                     {
                                         info!("I'm host now!");
@@ -425,8 +425,8 @@ pub fn receive_msgs(
                                                     next_state.set(GameStates::GamePlay)
                                                 }
                                                 snake_update.send(SnakeUpdate {
-                                                    update_time: update_time,
-                                                    user_id: user_id,
+                                                    update_time,
+                                                    user_id,
                                                     snake_details,
                                                 })
                                             }
@@ -539,8 +539,8 @@ pub fn send_snake_send(
             let transform = transforms.get(cell).unwrap();
             let (dir, move_id, tag) = moveid_direc.get(cell).unwrap();
             SnakeCellDetails {
-                cell_tag: tag.clone(),
-                transform: transform.clone(),
+                cell_tag: *tag,
+                transform: *transform,
                 move_id: MoveId(move_id.0),
                 direction: crate::Direction(dir.0),
             }
@@ -642,7 +642,7 @@ pub fn update_snake(
                                     custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
                                     ..default()
                                 },
-                                transform: cell.transform.clone().with_translation(
+                                transform: cell.transform.with_translation(
                                     cell.transform.translation + compensation_transform,
                                 ),
                                 ..default()
@@ -675,7 +675,7 @@ pub fn update_snake(
                                     custom_size: Some(Vec2::new(cell_size.0, cell_size.1)),
                                     ..default()
                                 },
-                                transform: cell.transform.clone(),
+                                transform: cell.transform,
                                 ..default()
                             },
                             move_id: MoveId(cell.move_id.0),

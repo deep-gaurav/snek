@@ -157,67 +157,63 @@ pub fn entry_menu(
     #[cfg(not(target_family = "wasm"))] runtime: ResMut<TokioTasksRuntime>,
 ) {
     for interaction in &interaction_query {
-        match *interaction.1 {
-            Interaction::Pressed => {
-                if host_button.get(interaction.0).is_ok() {
-                    let mut rng = rand::thread_rng();
-                    let random_number: u32 = rng.gen_range(100_000..1_000_000);
-                    let random_string = format!("{:06}", random_number);
+        if Interaction::Pressed == *interaction.1 {
+            if host_button.get(interaction.0).is_ok() {
+                let mut rng = rand::thread_rng();
+                let random_number: u32 = rng.gen_range(100_000..1_000_000);
+                let random_string = format!("{:06}", random_number);
 
-                    connect_transport(
-                        &random_string,
-                        connection_handler,
-                        #[cfg(not(target_family = "wasm"))]
-                        runtime,
-                    );
-                    break;
-                } else if join_button.get(interaction.0).is_ok() {
-                    for q in q_host_join_container.iter() {
-                        commands.entity(q).despawn_recursive();
-                    }
-                    if let Ok(root) = q_entry_menu_node.get_single() {
-                        setup_numpad(root, asset_server, &mut commands);
-                    }
-                    break;
-                } else if let Ok(but) = q_text_button.get(interaction.0) {
-                    if let Ok(mut input) = room_input.get_single_mut() {
-                        if let Some(section) = input.sections.first() {
-                            if section.value.len() < 6 {
-                                let new_section = TextSection::new(
-                                    format!("{}{}", section.value, but.0),
-                                    section.style.clone(),
-                                );
-                                input.sections = vec![new_section];
-                            }
-                        }
-                    }
-                } else if let Ok(_but) = q_back_button.get(interaction.0) {
-                    if let Ok(mut input) = room_input.get_single_mut() {
-                        if let Some(section) = input.sections.first() {
-                            let mut chars = section.value.chars();
-                            chars.next_back();
-                            let new_section =
-                                TextSection::new(chars.as_str(), section.style.clone());
+                connect_transport(
+                    &random_string,
+                    connection_handler,
+                    #[cfg(not(target_family = "wasm"))]
+                    runtime,
+                );
+                break;
+            } else if join_button.get(interaction.0).is_ok() {
+                for q in q_host_join_container.iter() {
+                    commands.entity(q).despawn_recursive();
+                }
+                if let Ok(root) = q_entry_menu_node.get_single() {
+                    setup_numpad(root, asset_server, &mut commands);
+                }
+                break;
+            } else if let Ok(but) = q_text_button.get(interaction.0) {
+                if let Ok(mut input) = room_input.get_single_mut() {
+                    if let Some(section) = input.sections.first() {
+                        if section.value.len() < 6 {
+                            let new_section = TextSection::new(
+                                format!("{}{}", section.value, but.0),
+                                section.style.clone(),
+                            );
                             input.sections = vec![new_section];
                         }
                     }
-                } else if let Ok(_but) = q_join_submit_button.get(interaction.0) {
-                    if let Ok(input) = room_input.get_single_mut() {
-                        if let Some(section) = input.sections.first() {
-                            if section.value.len() == 6 {
-                                connect_transport(
-                                    &section.value,
-                                    connection_handler,
-                                    #[cfg(not(target_family = "wasm"))]
-                                    runtime,
-                                );
-                                break;
-                            }
+                }
+            } else if let Ok(_but) = q_back_button.get(interaction.0) {
+                if let Ok(mut input) = room_input.get_single_mut() {
+                    if let Some(section) = input.sections.first() {
+                        let mut chars = section.value.chars();
+                        chars.next_back();
+                        let new_section = TextSection::new(chars.as_str(), section.style.clone());
+                        input.sections = vec![new_section];
+                    }
+                }
+            } else if let Ok(_but) = q_join_submit_button.get(interaction.0) {
+                if let Ok(input) = room_input.get_single_mut() {
+                    if let Some(section) = input.sections.first() {
+                        if section.value.len() == 6 {
+                            connect_transport(
+                                &section.value,
+                                connection_handler,
+                                #[cfg(not(target_family = "wasm"))]
+                                runtime,
+                            );
+                            break;
                         }
                     }
                 }
             }
-            _ => {}
         }
     }
 }
@@ -350,7 +346,7 @@ pub fn setup_numpad(parent: Entity, asset_server: Res<AssetServer>, commands: &m
                     ))
                     .with_children(|parent| {
                         parent.spawn((TextBundle::from_section(
-                            format!("0"),
+                            "0".to_string(),
                             TextStyle {
                                 font_size: 30.0,
                                 color: Color::rgb(0.9, 0.9, 0.9),
