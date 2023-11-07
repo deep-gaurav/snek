@@ -59,7 +59,7 @@
           }
     
           .highlighted {
-            background-color: rgb(187, 0, 0);
+            background-color: rgb(187, 0, 125);
           }
     </style>
     <link data-trunk rel="rust" href="Cargo.toml" data-wasm-opt="z" data-bin="snek" />
@@ -115,7 +115,7 @@
                 edgeIndexes[t2],
                 edgeIndexes[t3]
               ]);
-              setTimeout(highlightEdgeCells, 600); // Repeat after all cells are highlighted
+              setTimeout(highlightEdgeCells, 300); // Repeat after all cells are highlighted
             }
       
             highlightEdgeCells();
